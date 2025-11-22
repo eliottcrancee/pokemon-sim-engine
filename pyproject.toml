@@ -1,9 +1,21 @@
 [project]
-name = "pokemon"
+name = "pokemon-sim-engine"
 version = "0.1.0"
-description = "Add your description here"
+description = "A comprehensive Pokemon battle simulation engine optimized for Reinforcement Learning and AI research."
 readme = "README.md"
 requires-python = ">=3.13"
+authors = [{ name = "Eliott Crancée", email = "crancee.eliott@gmail.com" }]
+license = { text = "MIT" }
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Games/Entertainment :: Simulation",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
   "colorama>=0.4.6",
   "line-profiler>=5.0.0",
@@ -19,6 +31,11 @@ dependencies = [
   "loguru>=0.7.3",
   "ruff>=0.14.4",
 ]
+
+[project.urls]
+Homepage = "https://github.com/eliottcrancee/pokemon-sim-engine"
+Repository = "https://github.com/eliottcrancee/pokemon-sim-engine"
+Issues = "https://github.com/eliottcrancee/pokemon-sim-engine/issues"
 
 [project.optional-dependencies]
 dev = ["pytest>=8.3.2", "pytest-benchmark>=4.0.0"]
