@@ -1,10 +1,10 @@
 # tests/test_performance.py
 
-import multiprocessing as mp
 import os
 import time
 
 import pytest
+from joblib import Parallel, delayed, cpu_count
 
 from pokemon.agent import RandomAgent
 from pokemon.battle import Battle
@@ -43,7 +43,7 @@ def test_performance_battle_turns(benchmark, battle_instance):
     benchmark(run_turn)
 
 
-def battle_worker(duration: int, turns_queue: mp.Queue):
+def battle_worker(duration: int):
     """Worker function to run continuous battle turns for a specified duration
     and report the total number of turns completed.
     """
@@ -64,10 +64,10 @@ def battle_worker(duration: int, turns_queue: mp.Queue):
     agent_1 = RandomAgent()
 
     turns_count = 0
-    start_time = time.time()
+    start_time = time.perf_counter()
 
     # Run the loop until the duration is exceeded
-    while time.time() - start_time < duration:
+    while time.perf_counter() - start_time < duration:
         if battle.done:
             # Crucially, resetting the battle must be fast
             battle.reset()
@@ -81,7 +81,7 @@ def battle_worker(duration: int, turns_queue: mp.Queue):
         turns_count += 1
 
     # Report the final count back to the main process
-    turns_queue.put(turns_count)
+    return turns_count
 
 
 # NOTE: This function does not use the 'benchmark' fixture
@@ -93,7 +93,7 @@ def test_parallel_stress_test_turns():
     # Duration for the stress test (in seconds)
     DURATION = 10
     # Use all available CPU cores
-    NUM_PROCESSES = mp.cpu_count()
+    NUM_PROCESSES = cpu_count()
 
     global DEBUG
     DEBUG = False  # Disable debug mode for performance testing
@@ -102,32 +102,23 @@ def test_parallel_stress_test_turns():
     print(f"Target Duration: {DURATION}s")
     print(f"Using {NUM_PROCESSES} CPU cores...")
 
-    # A Queue to collect the turn count from each worker process
-    turns_queue = mp.Queue()
-    processes = []
-
     # --- Start Processes ---
-    for i in range(NUM_PROCESSES):
-        # Pass the duration and the queue to the worker
-        p = mp.Process(target=battle_worker, args=(DURATION, turns_queue))
-        processes.append(p)
-        p.start()
+
+    start_time = time.perf_counter()
+    results = Parallel(n_jobs=NUM_PROCESSES)(
+        delayed(battle_worker)(DURATION) for _ in range(NUM_PROCESSES)
+    )
+    end_time = time.perf_counter()
 
     # --- Wait and Aggregate Results ---
-    # Wait for all processes to complete their DURATION time limit
-    for p in processes:
-        p.join()
-
-    total_turns = 0
-    # Collect the results from the queue
-    while not turns_queue.empty():
-        total_turns += turns_queue.get()
+    total_turns = sum(results)
 
     # --- Report ---
-    print(f"Test completed in approximately {DURATION}s.")
+    print(f"Test completed in {end_time - start_time:.2f} seconds.")
     print(
         f"Total turns completed across all {NUM_PROCESSES} processes: {total_turns:,}"
     )
+    print(f"Overall Turns per Second: {total_turns / (end_time - start_time):,.2f} TPS")
 
 
 if __name__ == "__main__":
