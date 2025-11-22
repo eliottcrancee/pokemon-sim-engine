@@ -11,7 +11,7 @@ pip install .
 ## Usage
 
 ```python
-from envs.pokemon.battle import Battle
+from pokemon.battle import Battle
 # ...
 ```
 

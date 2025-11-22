@@ -1,8 +1,8 @@
 import os
 import sys
 
-# Ensure current working directory is in path
-sys.path.append(os.getcwd())
+# Ensure src directory is in path
+sys.path.append(os.path.join(os.getcwd(), "src"))
 
 from pokemon.agent import InputAgent
 from pokemon.battle import Battle
