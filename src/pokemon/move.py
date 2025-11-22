@@ -29,26 +29,26 @@ class MoveError(Exception):
         self.message = message
 
 
-class MoveCategory(Enum):
-    """Enum for Move categories."""
+class MoveCategoryValue:
+    """Class representing a value in the MoveCategory enum."""
 
-    Physical = auto()
-    Special = auto()
-    Status = auto()
-
-    def __repr__(self):
-        return f"MoveCategory.{self.name}"
+    def __init__(self, value: int, name: str):
+        self.value = value
+        self.name = name
 
     def __str__(self):
-        return self.name.capitalize()
-
-    def __hash__(self):
-        return hash(self.value)
+        return self.name
 
     def __eq__(self, other):
-        if isinstance(other, MoveCategory):
-            return self.value == other.value
-        return NotImplemented
+        return self.value == other.value
+
+
+class MoveCategory:
+    """Enum representing the category of a Pokémon move."""
+
+    Physical = MoveCategoryValue(0, "Physical")
+    Special = MoveCategoryValue(1, "Special")
+    Status = MoveCategoryValue(2, "Status")
 
 
 @dataclass
@@ -57,7 +57,7 @@ class Move:
 
     move_id: int
     name: str
-    category: MoveCategory
+    category: MoveCategoryValue
     type: PokemonType
     power: int
     accuracy: int
@@ -74,7 +74,7 @@ class Move:
             raise MoveError(
                 f"Move ID must be an integer, not {type(self.move_id).__name__}"
             )
-        if not isinstance(self.category, MoveCategory):
+        if not isinstance(self.category, MoveCategoryValue):
             raise MoveError(
                 f"Category must be a MoveCategory, not {type(self.category).__name__}"
             )
@@ -108,9 +108,10 @@ class Move:
             user.level_factor * self.power * (attack_stat / defense_stat)
         ) / 50 + 2
         effectiveness = self.type.effectiveness_against(target.types)
-        damage = base_damage * effectiveness * random.uniform(0.85, 1.0)
 
-        critical = random.random() < 0.0625  # 1/16 chance
+        damage = base_damage * effectiveness * (0.85 + 0.15 * random.random())
+
+        critical = random.getrandbits(4) == 0
         if critical:
             damage *= 1.5
 
@@ -142,10 +143,8 @@ class Move:
     def __repr__(self):
         return f"Move(id={self.move_id}, name={self.name}, category={self.category}, type={self.type}, power={self.power}, accuracy={self.accuracy}, pp={self.pp})"
 
-    def __eq__(self, other) -> bool:
-        if isinstance(other, Move):
-            return self.move_id == other.move_id
-        return NotImplemented
+    def __eq__(self, other: "Move") -> bool:
+        return self.move_id == other.move_id
 
     @property
     def memory_size(self) -> int:
@@ -231,13 +230,31 @@ RazorLeaf = Move(
     7, "Razor Leaf", MoveCategory.Physical, PokemonTypeAccessor.Grass, 55, 95, 25
 )
 QuickAttack = Move(
-    8, "Quick Attack", MoveCategory.Physical, PokemonTypeAccessor.Normal, 40, 100, 30
+    8,
+    "Quick Attack",
+    MoveCategory.Physical,
+    PokemonTypeAccessor.Normal,
+    40,
+    100,
+    30,
 )
 WingAttack = Move(
-    9, "Wing Attack", MoveCategory.Physical, PokemonTypeAccessor.Flying, 35, 100, 35
+    9,
+    "Wing Attack",
+    MoveCategory.Physical,
+    PokemonTypeAccessor.Flying,
+    35,
+    100,
+    35,
 )
 Earthquake = Move(
-    10, "Earthquake", MoveCategory.Physical, PokemonTypeAccessor.Ground, 100, 100, 10
+    10,
+    "Earthquake",
+    MoveCategory.Physical,
+    PokemonTypeAccessor.Ground,
+    100,
+    100,
+    10,
 )
 
 # --- Special Moves ---
@@ -261,7 +278,13 @@ HydroPump = Move(
     15, "Hydro Pump", MoveCategory.Special, PokemonTypeAccessor.Water, 120, 80, 5
 )
 Thunderbolt = Move(
-    16, "Thunderbolt", MoveCategory.Special, PokemonTypeAccessor.Electric, 95, 100, 15
+    16,
+    "Thunderbolt",
+    MoveCategory.Special,
+    PokemonTypeAccessor.Electric,
+    95,
+    100,
+    15,
 )
 Psychic = Move(
     17, "Psychic", MoveCategory.Special, PokemonTypeAccessor.Psychic, 90, 100, 10

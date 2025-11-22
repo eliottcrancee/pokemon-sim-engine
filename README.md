@@ -12,7 +12,7 @@ A high-performance, extensible Pokemon battle simulation engine written in Pytho
 *   **AI-Ready**: Built-in support for tensor representations of game state, making it easy to integrate with PyTorch for Deep Reinforcement Learning.
 *   **Customizable**: Easily create custom Pokemon, Moves, Items, and Trainers.
 *   **Interactive UI**: Includes a command-line interface (CLI) for human-vs-human or human-vs-AI battles, or even AI-vs-AI battles.
-*   **Performance**: Optimized for speed to facilitate rapid training of AI agents. Capable of simulating over **150,000 turns per second** on a standard laptop (12th Gen Intel i5-12450H).
+*   **Performance**: Optimized for speed to facilitate rapid training of AI agents. Capable of simulating over **165,000 turns per second** on a standard laptop (12th Gen Intel i5-12450H).
 
 ## 📦 Installation
 

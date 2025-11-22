@@ -6,7 +6,7 @@ from pokemon.move import (
     MOVE_LIST,
     Move,
     MoveAccessor,
-    MoveCategory,
+    MoveCategoryValue,
     PokemonTypeAccessor,
     Struggle,
 )
@@ -27,10 +27,11 @@ def test_move_creation_and_representation():
     """Tests basic move attributes and string representation."""
     tackle = MoveAccessor.Tackle
     assert tackle.name == "Tackle"
-    assert tackle.category == MoveCategory.Physical
+    assert tackle.category == MoveCategoryValue.Physical
     assert tackle.type == PokemonTypeAccessor.Normal
     assert str(tackle) == "Tackle | Type: Normal | PP: 35/35"
     assert "Move(id=2, name=Tackle" in repr(tackle)
+
 
 def test_damage_calculation(pokemon_instances):
     """Tests the damage calculation for a move.
@@ -56,7 +57,13 @@ def test_status_move_no_damage(pokemon_instances):
     """Tests that status moves deal no damage."""
     # We need a status move to test this. Let's create one for the test.
     status_move = Move(
-        99, "Test Status", MoveCategory.Status, PokemonTypeAccessor.Normal, 0, 100, 20
+        99,
+        "Test Status",
+        MoveCategoryValue.Status,
+        PokemonTypeAccessor.Normal,
+        0,
+        100,
+        20,
     )
     user, target, _ = pokemon_instances
     damage, _, _, _, _ = status_move.calculate_damage(user, target)

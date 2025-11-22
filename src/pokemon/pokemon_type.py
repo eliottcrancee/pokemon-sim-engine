@@ -67,10 +67,8 @@ class PokemonType:
     def __str__(self) -> str:
         return self.name.capitalize()
 
-    def __eq__(self, other) -> bool:
-        if isinstance(other, PokemonType):
-            return self.type_id == other.type_id
-        raise PokemonTypeError("Can only compare with another PokemonType")
+    def __eq__(self, other: "PokemonType") -> bool:
+        return self.type_id == other.type_id
 
     def __hash__(self) -> int:
         return hash((self.type_id, self.name))

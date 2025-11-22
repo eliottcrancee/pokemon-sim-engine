@@ -4,7 +4,7 @@ import os
 import time
 
 import pytest
-from joblib import Parallel, delayed, cpu_count
+from joblib import Parallel, cpu_count, delayed
 
 from pokemon.agent import RandomAgent
 from pokemon.battle import Battle
