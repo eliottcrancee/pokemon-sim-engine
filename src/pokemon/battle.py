@@ -11,11 +11,11 @@ from colorama import init
 # Ensure current working directory is in path
 sys.path.append(os.getcwd())
 
-from envs.pokemon.action import Action, ActionType
-from envs.pokemon.config import DEBUG
-from envs.pokemon.message import Message
-from envs.pokemon.move import MoveAccessor, MoveCategory
-from envs.pokemon.trainer import Trainer
+from pokemon.action import Action, ActionType
+from pokemon.config import DEBUG
+from pokemon.message import Message
+from pokemon.move import MoveAccessor, MoveCategory
+from pokemon.trainer import Trainer
 
 init(autoreset=True)
 

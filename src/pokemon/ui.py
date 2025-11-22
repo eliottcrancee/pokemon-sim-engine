@@ -5,11 +5,11 @@ from collections import deque
 
 from colorama import Fore, Style, init
 
-from envs.pokemon.action import Action
-from envs.pokemon.agent import BaseAgent, InputAgent
-from envs.pokemon.battle import Battle
-from envs.pokemon.pokemon import Pokemon, PokemonStatus
-from envs.pokemon.trainer import Trainer
+from pokemon.action import Action
+from pokemon.agent import BaseAgent, InputAgent
+from pokemon.battle import Battle
+from pokemon.pokemon import Pokemon, PokemonStatus
+from pokemon.trainer import Trainer
 
 # Initialize colorama
 init(autoreset=True)

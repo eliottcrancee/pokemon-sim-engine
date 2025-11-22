@@ -2,9 +2,38 @@
 
 import pytest
 
-from envs.pokemon.agent import BaseAgent, RandomAgent
-from envs.pokemon.battle import Battle
-from envs.pokemon.play import battle_generator, play, play_multiple
+from pokemon.agent import BaseAgent, RandomAgent
+from pokemon.battle import Battle
+from pokemon.play import play, play_multiple
+
+
+def battle_generator(randomize=False):
+    from pokemon.battle import Battle
+    from pokemon.item import ItemAccessor
+    from pokemon.pokemon import PokemonAccessor
+    from pokemon.trainer import Trainer
+
+    pikachu_ash = PokemonAccessor.Pikachu(level=10)
+    charmander_ash = PokemonAccessor.Chimchar(level=10)
+    potion_ash = ItemAccessor.Potion(default_quantity=2)
+
+    ash = Trainer(
+        name="Ash",
+        pokemon_team=[pikachu_ash, charmander_ash],
+        inventory={ItemAccessor.Potion: potion_ash},
+    )
+
+    squirtle_gary = PokemonAccessor.Pikachu(level=10)
+    bulbasaur_gary = PokemonAccessor.Chimchar(level=10)
+    potion_gary = ItemAccessor.Potion(default_quantity=2)
+
+    gary = Trainer(
+        name="Gary",
+        pokemon_team=[squirtle_gary, bulbasaur_gary],
+        inventory={ItemAccessor.Potion: potion_gary},
+    )
+
+    return Battle(trainer_0=ash, trainer_1=gary, max_rounds=100)
 
 
 class MockAgent(BaseAgent):
@@ -49,7 +78,7 @@ def test_play_single_game(agents):
     agent_0, agent_1 = agents
     battle = battle_generator()
 
-    winner = play(battle, agent_0, agent_1, verbose=False)
+    winner = play(battle, agent_0, agent_1)
 
     assert battle.done
     assert winner in [0, 1, 0.5]  # Winner is 0, 1, or 0.5 for a draw
@@ -62,7 +91,7 @@ def test_play_single_game_with_mock_agents(mock_agents):
 
     # This test ensures that with predictable agents, the game runs to completion
     # without getting stuck in a loop.
-    winner = play(battle, agent_0, agent_1, verbose=False)
+    winner = play(battle, agent_0, agent_1)
 
     assert battle.done
     assert winner in [0, 1, 0.5]

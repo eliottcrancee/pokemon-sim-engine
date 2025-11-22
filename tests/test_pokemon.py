@@ -2,7 +2,7 @@
 
 import torch
 
-from envs.pokemon.pokemon import (
+from pokemon.pokemon import (
     POKEMON_LIST,
     PokemonAccessor,
     PokemonError,

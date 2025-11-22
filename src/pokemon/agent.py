@@ -10,8 +10,8 @@ from colorama import Fore
 # Ensure current working directory is in path
 sys.path.append(os.getcwd())
 
-from envs.pokemon.action import Action
-from envs.pokemon.battle import Battle
+from pokemon.action import Action
+from pokemon.battle import Battle
 
 # Device global
 DEVICE = torch.device("cpu")

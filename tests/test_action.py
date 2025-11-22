@@ -3,11 +3,11 @@
 import pytest
 import torch
 
-from envs.pokemon.action import Action, ActionError, ActionType
-from envs.pokemon.item import ItemAccessor
-from envs.pokemon.move import MoveAccessor
-from envs.pokemon.pokemon import PokemonAccessor
-from envs.pokemon.trainer import Trainer
+from pokemon.action import Action, ActionError, ActionType
+from pokemon.item import ItemAccessor
+from pokemon.move import MoveAccessor
+from pokemon.pokemon import PokemonAccessor
+from pokemon.trainer import Trainer
 
 
 @pytest.fixture
@@ -40,7 +40,7 @@ def test_attack_action(trainers):
         move=move,
     )
 
-    assert str(action) == f"Ash's Pikachu uses {move.name}."
+    assert str(action) == f"Attack using {move.name}"
 
     initial_opponent_hp = opponent.pokemon_team[0].hp
     messages = action.execute()
@@ -56,7 +56,7 @@ def test_switch_action(trainers):
     action = Action(action_type=ActionType.SWITCH, trainer=trainer, target_index=1)
 
     initial_active_pokemon = trainer.pokemon_team[0]
-    assert str(action) == "Ash switches from Pikachu to Chimchar."
+    assert str(action) == "Switch to Chimchar"
 
     messages = action.execute()
 
@@ -78,7 +78,7 @@ def test_use_item_action(trainers):
         item=item,
     )
 
-    assert str(action) == "Ash uses Potion on Chimchar."
+    assert str(action) == "Use Potion on Chimchar"
 
     initial_target_hp = trainer.pokemon_team[1].hp
     initial_item_quantity = item.quantity

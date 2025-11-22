@@ -2,7 +2,7 @@
 
 import torch
 
-from envs.pokemon.tensor_cache import OneHotCache, create_new_one_hot
+from pokemon.tensor_cache import OneHotCache, create_new_one_hot
 
 
 def test_one_hot_cache_correctness():

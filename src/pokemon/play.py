@@ -3,17 +3,14 @@ import os
 import sys
 import traceback
 
-from dotenv import load_dotenv
 from tqdm import tqdm
 
 # Ensure current working directory is in path
 sys.path.append(os.getcwd())
 
-from envs.pokemon.agent import BaseAgent, InputAgent
-from envs.pokemon.battle import Battle
-
-load_dotenv()
-DEBUG = os.getenv("DEBUG") in ["True", "true", "1", "t", "y", "yes"]
+from pokemon.agent import BaseAgent, InputAgent
+from pokemon.battle import Battle
+from pokemon.config import DEBUG
 
 
 def play(battle: Battle, agent_0: BaseAgent, agent_1: BaseAgent):
@@ -44,7 +41,7 @@ def play_multiple(
 ) -> tuple[int, int, int]:
     agent_0_wins, agent_1_wins, draws = 0, 0, 0
     for _ in tqdm(range(n_battles), desc="Playing", disable=not verbose):
-        winner = play(battle, agent_0, agent_1, verbose=verbose, ui=ui)
+        winner = play(battle, agent_0, agent_1)
         if winner == 0.5:
             draws += 1
         elif winner == 0:

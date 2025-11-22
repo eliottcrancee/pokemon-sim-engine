@@ -11,10 +11,10 @@ from pympler import asizeof
 # Ensure current working directory is in path
 sys.path.append(os.getcwd())
 
-from envs.pokemon.config import DEBUG, MAX_ITEM_QUANTITY
-from envs.pokemon.message import Message
-from envs.pokemon.pokemon import Pokemon, PokemonStatus
-from envs.pokemon.tensor_cache import ONEHOTCACHE
+from pokemon.config import DEBUG, MAX_ITEM_QUANTITY
+from pokemon.message import Message
+from pokemon.pokemon import Pokemon, PokemonStatus
+from pokemon.tensor_cache import ONEHOTCACHE
 
 
 class ItemError(Exception):

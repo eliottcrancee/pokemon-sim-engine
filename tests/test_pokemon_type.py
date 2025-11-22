@@ -2,7 +2,7 @@
 
 import pytest
 
-from envs.pokemon.pokemon_type import PokemonType, PokemonTypeAccessor, PokemonTypeError
+from pokemon.pokemon_type import PokemonType, PokemonTypeAccessor, PokemonTypeError
 
 
 def test_type_accessor():

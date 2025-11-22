@@ -3,10 +3,10 @@
 import pytest
 import torch
 
-from envs.pokemon.action import ActionType
-from envs.pokemon.battle import Battle
-from envs.pokemon.pokemon import PokemonAccessor
-from envs.pokemon.trainer import Trainer
+from pokemon.action import ActionType
+from pokemon.battle import Battle
+from pokemon.pokemon import PokemonAccessor
+from pokemon.trainer import Trainer
 
 
 @pytest.fixture

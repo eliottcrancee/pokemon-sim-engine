@@ -2,8 +2,8 @@
 
 import pytest
 
-from envs.pokemon.item import ItemAccessor, ItemError, Potion
-from envs.pokemon.pokemon import PokemonAccessor, PokemonStatus
+from pokemon.item import ItemAccessor, ItemError, Potion
+from pokemon.pokemon import PokemonAccessor, PokemonStatus
 
 
 @pytest.fixture

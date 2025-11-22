@@ -11,14 +11,14 @@ from pympler import asizeof
 # Ensure current working directory is in path
 sys.path.append(os.getcwd())  # nopep8
 
-from envs.pokemon.config import (
+from pokemon.config import (
     DEBUG,
     MAX_ITEM_QUANTITY,
     MAX_ITEMS_PER_TRAINER,
     MAX_POKEMON_PER_TRAINER,
 )
-from envs.pokemon.item import Item, ItemAccessor
-from envs.pokemon.pokemon import (
+from pokemon.item import Item, ItemAccessor
+from pokemon.pokemon import (
     POKEMON_ONE_HOT_DESCRIPTION,
     POKEMON_ONE_HOT_PADDING,
     POKEMON_STATUS_ONE_HOT_DESCRIPTION,

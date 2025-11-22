@@ -4,12 +4,12 @@ import sys
 # Ensure current working directory is in path
 sys.path.append(os.getcwd())
 
-from envs.pokemon.agent import InputAgent
-from envs.pokemon.battle import Battle
-from envs.pokemon.item import ItemAccessor
-from envs.pokemon.pokemon import PokemonAccessor
-from envs.pokemon.trainer import Trainer
-from envs.pokemon.ui import play_ui
+from pokemon.agent import InputAgent
+from pokemon.battle import Battle
+from pokemon.item import ItemAccessor
+from pokemon.pokemon import PokemonAccessor
+from pokemon.trainer import Trainer
+from pokemon.ui import play_ui
 
 
 def main():

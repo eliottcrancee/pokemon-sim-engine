@@ -2,7 +2,7 @@
 
 import pytest
 
-from envs.pokemon.move import (
+from pokemon.move import (
     MOVE_LIST,
     Move,
     MoveAccessor,
@@ -10,7 +10,7 @@ from envs.pokemon.move import (
     PokemonTypeAccessor,
     Struggle,
 )
-from envs.pokemon.pokemon import PokemonAccessor
+from pokemon.pokemon import PokemonAccessor
 
 
 @pytest.fixture

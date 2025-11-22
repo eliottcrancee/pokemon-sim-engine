@@ -11,7 +11,7 @@ from pympler import asizeof
 # Ensure current working directory is in path
 sys.path.append(os.getcwd())
 
-from envs.pokemon.config import DEBUG
+from pokemon.config import DEBUG
 
 
 class PokemonTypeError(Exception):

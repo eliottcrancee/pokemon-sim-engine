@@ -3,9 +3,9 @@
 import pytest
 import torch
 
-from envs.pokemon.item import ItemAccessor
-from envs.pokemon.pokemon import PokemonAccessor
-from envs.pokemon.trainer import MAX_POKEMON_PER_TRAINER, Trainer, TrainerError
+from pokemon.item import ItemAccessor
+from pokemon.pokemon import PokemonAccessor
+from pokemon.trainer import MAX_POKEMON_PER_TRAINER, Trainer, TrainerError
 
 
 @pytest.fixture
