@@ -6,12 +6,17 @@ from dataclasses import dataclass, field
 from functools import cached_property
 
 import torch
-from dotenv import load_dotenv
 from pympler import asizeof
 
 # Ensure current working directory is in path
 sys.path.append(os.getcwd())  # nopep8
 
+from envs.pokemon.config import (
+    DEBUG,
+    MAX_ITEM_QUANTITY,
+    MAX_ITEMS_PER_TRAINER,
+    MAX_POKEMON_PER_TRAINER,
+)
 from envs.pokemon.item import Item, ItemAccessor
 from envs.pokemon.pokemon import (
     POKEMON_ONE_HOT_DESCRIPTION,
@@ -21,12 +26,6 @@ from envs.pokemon.pokemon import (
     Pokemon,
 )
 
-load_dotenv()
-DEBUG = os.getenv("DEBUG") in ["True", "true", "1", "t", "y", "yes"]
-
-MAX_ITEMS_PER_TRAINER = int(os.getenv("MAX_ITEMS_PER_TRAINER"))
-MAX_POKEMON_PER_TRAINER = int(os.getenv("MAX_POKEMON_PER_TRAINER"))
-MAX_ITEM_QUANTITY = int(os.getenv("MAX_ITEM_QUANTITY"))
 MAX_MOVES = 4
 
 POKEMON_PADDING_CACHE = {

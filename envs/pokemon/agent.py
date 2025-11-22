@@ -6,7 +6,6 @@ import sys
 
 import torch
 from colorama import Fore
-from dotenv import load_dotenv
 
 # Ensure current working directory is in path
 sys.path.append(os.getcwd())
@@ -16,10 +15,6 @@ from envs.pokemon.battle import Battle
 
 # Device global
 DEVICE = torch.device("cpu")
-
-
-load_dotenv()
-DEBUG = os.getenv("DEBUG") in ["True", "true", "1", "t", "y", "yes"]
 
 
 class BaseAgent:

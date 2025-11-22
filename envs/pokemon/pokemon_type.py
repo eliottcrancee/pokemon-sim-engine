@@ -6,14 +6,12 @@ import os
 import sys
 from dataclasses import dataclass, field
 
-from dotenv import load_dotenv
 from pympler import asizeof
 
 # Ensure current working directory is in path
 sys.path.append(os.getcwd())
 
-load_dotenv()
-DEBUG = os.getenv("DEBUG", "").lower() in ["true", "1", "t", "y", "yes"]
+from envs.pokemon.config import DEBUG
 
 
 class PokemonTypeError(Exception):

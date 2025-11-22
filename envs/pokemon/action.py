@@ -6,22 +6,17 @@ from dataclasses import dataclass
 from enum import Enum, auto
 
 import torch
-from dotenv import load_dotenv
 from pympler import asizeof
 
 # Ensure current working directory is in path
 sys.path.append(os.getcwd())
 
+from envs.pokemon.config import DEBUG, MAX_POKEMON_PER_TRAINER
 from envs.pokemon.item import ITEM_LIST, ITEM_ONE_HOT_DESCRIPTION, Item
 from envs.pokemon.message import Message
 from envs.pokemon.move import MOVE_ONE_HOT_DESCRIPTION, Move
 from envs.pokemon.tensor_cache import ONEHOTCACHE
 from envs.pokemon.trainer import ZEROS_TENSOR_CACHE, Trainer
-
-load_dotenv()
-DEBUG = os.getenv("DEBUG") in ["True", "true", "1", "t", "y", "yes"]
-
-MAX_POKEMON_PER_TRAINER = int(os.getenv("MAX_POKEMON_PER_TRAINER"))
 
 
 class ActionError(Exception):

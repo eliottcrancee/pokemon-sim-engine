@@ -8,18 +8,15 @@ from enum import Enum, auto
 from functools import cached_property
 
 import torch
-from dotenv import load_dotenv
 from pympler import asizeof
 
 # Ensure current working directory is in path
 sys.path.append(os.getcwd())
 
+from envs.pokemon.config import DEBUG
 from envs.pokemon.message import Message
 from envs.pokemon.pokemon_type import PokemonType, PokemonTypeAccessor
 from envs.pokemon.tensor_cache import ONEHOTCACHE
-
-load_dotenv()
-DEBUG = os.getenv("DEBUG", "").lower() in ["true", "1", "t", "y", "yes"]
 
 ACCURACY_MODIFIERS = [0.33, 0.38, 0.43, 0.5, 0.6, 0.75, 1, 1.33, 1.67, 2, 2.33, 2.67, 3]
 

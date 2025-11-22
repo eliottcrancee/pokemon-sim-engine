@@ -7,20 +7,17 @@ from dataclasses import dataclass
 
 import torch
 from colorama import init
-from dotenv import load_dotenv
 
 # Ensure current working directory is in path
 sys.path.append(os.getcwd())
 
 from envs.pokemon.action import Action, ActionType
+from envs.pokemon.config import DEBUG
 from envs.pokemon.message import Message
 from envs.pokemon.move import MoveAccessor, MoveCategory
 from envs.pokemon.trainer import Trainer
 
 init(autoreset=True)
-
-load_dotenv()
-DEBUG = os.getenv("DEBUG") in ["True", "true", "1", "t", "y", "yes"]
 
 
 @dataclass
