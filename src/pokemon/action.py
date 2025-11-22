@@ -14,7 +14,7 @@ sys.path.append(os.getcwd())
 from pokemon.config import DEBUG, MAX_POKEMON_PER_TRAINER
 from pokemon.item import ITEM_LIST, ITEM_ONE_HOT_DESCRIPTION, Item
 from pokemon.message import Message
-from pokemon.move import MOVE_ONE_HOT_DESCRIPTION, Move
+from pokemon.move import MOVE_ONE_HOT_DESCRIPTION, Move, MoveCategory
 from pokemon.tensor_cache import ONEHOTCACHE
 from pokemon.trainer import ZEROS_TENSOR_CACHE, Trainer
 
@@ -92,7 +92,10 @@ class Action:
             return f"Use {self.item.name} on {self.trainer.pokemon_team[self.target_index].surname}"
 
     def execute(self) -> list[Message]:
-        messages = [Message(str(self))]
+        s = str(self)
+        if s:
+            s = self.trainer.name + " chooses to " + s[0].lower() + s[1:]
+        messages = [Message(s)]
         if self.action_type == ActionType.ATTACK:
             messages += self.execute_move()
         elif self.action_type == ActionType.SWITCH:
@@ -111,16 +114,19 @@ class Action:
                 self.move.calculate_damage(user, target)
             )
             target.hp -= damage
-            if effectiveness > 1:
-                messages.append(Message("It's super effective!"))
-            elif 0 < effectiveness < 1:
-                messages.append(Message("It's not very effective..."))
-            elif effectiveness == 0:
+            if effectiveness == 0:
                 messages.append(Message("It doesn't affect the target..."))
-            if critical:
-                messages.append(Message("Critical hit!"))
-            if damage > 0:
+            elif damage > 0:
+                if effectiveness > 1:
+                    messages.append(Message("It's super effective!"))
+                elif 0 < effectiveness < 1:
+                    messages.append(Message("It's not very effective..."))
+
+                if critical:
+                    messages.append(Message("Critical hit!"))
                 messages.append(Message(f"{target.surname} lost {damage} HP."))
+            elif self.move.category != MoveCategory.Status:
+                messages.append(Message(f"{user.surname}'s attack missed!"))
             messages += self.move.secondary_effect(
                 user, target, damage, base_damage, critical, stab, effectiveness
             )

@@ -59,6 +59,13 @@ class Item:
             self.validate_inputs()
         self.quantity = self.default_quantity
 
+    def copy(self):
+        cls = self.__class__
+        new_item = cls.__new__(cls)
+        for k, v in self.__dict__.items():
+            setattr(new_item, k, v)
+        return new_item
+
     def validate_inputs(self):
         if not isinstance(self.name, str):
             raise ItemError(f"Name must be a string, not {type(self.name).__name__}")

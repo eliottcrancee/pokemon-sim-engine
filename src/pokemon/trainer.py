@@ -48,7 +48,7 @@ POKEMON_ZERROS_PADDING_CACHE[MAX_POKEMON_PER_TRAINER] = torch.tensor([])
 
 ZEROS_TENSOR_CACHE = {
     i: torch.zeros(i)
-    for i in range(MAX_POKEMON_PER_TRAINER + MAX_ITEMS_PER_TRAINER + 10)
+    for i in range(MAX_POKEMON_PER_TRAINER + MAX_ITEMS_PER_TRAINER + 30)
 }
 
 EMPTY_ITEM = ItemAccessor.Potion(0)
@@ -66,11 +66,21 @@ class TrainerError(Exception):
 class Trainer:
     name: str
     pokemon_team: list[Pokemon] = field(default_factory=list)
-    inventory: dict[Item, Item] = field(default_factory=dict)
+    inventory: dict[str, Item] = field(default_factory=dict)
 
     def __post_init__(self):
         if DEBUG:
             self.validate_inputs()
+
+    def copy(self):
+        cls = self.__class__
+        new_trainer = cls.__new__(cls)
+        new_trainer.name = self.name
+        new_trainer.pokemon_team = [pokemon.copy() for pokemon in self.pokemon_team]
+        new_trainer.inventory = {
+            name: item.copy() for name, item in self.inventory.items()
+        }
+        return new_trainer
 
     def validate_inputs(self):
         if not isinstance(self.name, str):
@@ -91,6 +101,11 @@ class Trainer:
             raise TrainerError(f"Pokemon team cannot exceed {MAX_POKEMON_PER_TRAINER}")
         if len(self.inventory) > MAX_ITEMS_PER_TRAINER:
             raise TrainerError(f"Inventory cannot exceed {MAX_ITEMS_PER_TRAINER}")
+        if not all(
+            isinstance(k, str) and isinstance(v, Item)
+            for k, v in self.inventory.items()
+        ):
+            raise TrainerError("Inventory must be a dictionary of item names to Item objects.")
 
     def switch_pokemon(self, new_pokemon):
         if DEBUG:
@@ -195,7 +210,7 @@ class Trainer:
                     ),
                     torch.tensor(
                         [
-                            self.inventory.get(item, EMPTY_ITEM).quantity
+                            self.inventory.get(item.name, EMPTY_ITEM).quantity
                             / MAX_ITEM_QUANTITY
                             for item in ItemAccessor
                         ]
@@ -214,7 +229,7 @@ class Trainer:
                     ZEROS_TENSOR_CACHE[2],
                     torch.tensor(
                         [
-                            self.inventory.get(item, EMPTY_ITEM).quantity
+                            self.inventory.get(item.name, EMPTY_ITEM).quantity
                             / MAX_ITEM_QUANTITY
                             for item in ItemAccessor
                         ]

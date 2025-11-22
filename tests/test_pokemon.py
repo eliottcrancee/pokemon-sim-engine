@@ -15,7 +15,10 @@ def test_pokemon_enums():
     assert str(PokemonStatus.Healthy) == "Healthy"
     assert repr(PokemonStatus.Burn) == "PokemonStatus.Burn"
     assert PokemonAccessor.Pikachu.name.capitalize() == "Pikachu"
-    assert repr(PokemonAccessor) == "Pokemons(Pikachu, Chimchar, Piplup)"
+    assert (
+        repr(PokemonAccessor)
+        == "Pokemons(Pikachu, Chimchar, Piplup, Bulbasaur, Charmander, Squirtle, Pidgey, Rattata, Sandshrew, Eevee)"
+    )
 
 
 def test_pokemon_creation_and_details():
@@ -24,7 +27,7 @@ def test_pokemon_creation_and_details():
     assert pikachu.level == 10
     assert pikachu.name == "pikachu"
     assert pikachu.hp == pikachu.max_hp
-    assert "Scratch" in [move.name for move in pikachu.moves]
+    assert "Thunder Shock" in [move.name for move in pikachu.moves]
 
 
 def test_stat_modifiers():

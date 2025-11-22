@@ -32,6 +32,27 @@ class Battle:
             self.validate_inputs()
         self.reset()
 
+    def copy(self):
+        cls = self.__class__
+        new_battle = cls.__new__(cls)
+        new_battle.trainer_0 = self.trainer_0.copy()
+        new_battle.trainer_1 = self.trainer_1.copy()
+        new_battle.max_rounds = self.max_rounds
+        new_battle.record_messages = self.record_messages
+        new_battle.round = self.round
+        new_battle.winner = self.winner
+        new_battle.tie = self.tie
+        new_battle.history = [h for h in self.history]
+        return new_battle
+
+    def get_trainer_by_id(self, trainer_id: int) -> Trainer:
+        if trainer_id == 0:
+            return self.trainer_0
+        elif trainer_id == 1:
+            return self.trainer_1
+        else:
+            raise ValueError(f"Invalid trainer ID: {trainer_id}")
+
     def validate_inputs(self):
         if not isinstance(self.trainer_0, Trainer):
             raise TypeError(
@@ -121,17 +142,28 @@ class Battle:
             and action_1.action_type == ActionType.ATTACK
         ):
             if (
-                self.trainer_0.pokemon_team[0].speed
-                > self.trainer_1.pokemon_team[0].speed
+                action_0.move == MoveAccessor.QuickAttack
+                and action_1.move != MoveAccessor.QuickAttack
             ):
                 first_action = 0
             elif (
-                self.trainer_0.pokemon_team[0].speed
-                == self.trainer_1.pokemon_team[0].speed
+                action_1.move == MoveAccessor.QuickAttack
+                and action_0.move != MoveAccessor.QuickAttack
             ):
-                first_action = random.choice([0, 1])
-            else:
                 first_action = 1
+            else:
+                if (
+                    self.trainer_0.pokemon_team[0].speed
+                    > self.trainer_1.pokemon_team[0].speed
+                ):
+                    first_action = 0
+                elif (
+                    self.trainer_0.pokemon_team[0].speed
+                    == self.trainer_1.pokemon_team[0].speed
+                ):
+                    first_action = random.choice([0, 1])
+                else:
+                    first_action = 1
         elif action_0.action_type == ActionType.ATTACK:
             first_action = 1
         elif action_1.action_type == ActionType.ATTACK:
@@ -145,16 +177,6 @@ class Battle:
             messages = action_1.execute()
 
         if self.end():
-            if self.tie:
-                messages.append(Message("It's a tie!"))
-            else:
-                (
-                    messages.append(Message(f"{self.trainer_0.name} wins the battle!"))
-                    if self.winner == 0
-                    else messages.append(
-                        Message(f"{self.trainer_1.name} wins the battle!")
-                    )
-                )
             return messages
 
         fainted, new_messages = self.check_active_alive()
@@ -168,16 +190,6 @@ class Battle:
             messages += action_0.execute()
 
         if self.end():
-            if self.tie:
-                messages.append(Message("It's a tie!"))
-            else:
-                (
-                    messages.append(Message(f"{self.trainer_0.name} wins the battle!"))
-                    if self.winner == 0
-                    else messages.append(
-                        Message(f"{self.trainer_1.name} wins the battle!")
-                    )
-                )
             return messages
 
         fainted, new_messages = self.check_active_alive()
@@ -189,16 +201,6 @@ class Battle:
             messages += pokemon.after_turn()
 
         if self.end():
-            if self.tie:
-                messages.append(Message("It's a tie!"))
-            else:
-                (
-                    messages.append(Message(f"{self.trainer_0.name} wins the battle!"))
-                    if self.winner == 0
-                    else messages.append(
-                        Message(f"{self.trainer_1.name} wins the battle!")
-                    )
-                )
             return messages
 
         _, new_messages = self.check_active_alive()
@@ -207,8 +209,8 @@ class Battle:
         return messages
 
     def get_possible_actions(self, trainer_id: int) -> list[Action]:
-        trainer = self.trainer_0 if trainer_id == 0 else self.trainer_1
-        opponent = self.trainer_1 if trainer_id == 0 else self.trainer_0
+        trainer = self.get_trainer_by_id(trainer_id)
+        opponent = self.get_trainer_by_id(trainer_id)
 
         actions = []
 
@@ -238,8 +240,8 @@ class Battle:
                 )
             )
 
-        for index, pokemon in enumerate(trainer.pokemon_team[1:]):
-            if index + 1 != 0 and pokemon.is_alive:
+        for index, pokemon_in_team in enumerate(trainer.pokemon_team[1:]):
+            if pokemon_in_team.is_alive:
                 actions.append(
                     Action(
                         action_type=ActionType.SWITCH,

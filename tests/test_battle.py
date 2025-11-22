@@ -1,5 +1,7 @@
 # tests/test_battle.py
 
+import copy
+
 import pytest
 import torch
 
@@ -110,7 +112,80 @@ def test_battle_tensor_creation(battle_instance):
     assert len(tensor_0) == len(description)
 
 
-# --- Performance Test ---
+def test_battle_custom_copy_performance(benchmark, battle_instance):
+    """Benchmarks the custom copy method."""
+    # Benchmark custom copy
+    custom_copied_battle = benchmark(battle_instance.copy)
+
+    # Ensure it's a new instance
+    assert custom_copied_battle is not battle_instance
+    assert custom_copied_battle.trainer_0 is not battle_instance.trainer_0
+    assert custom_copied_battle.trainer_1 is not battle_instance.trainer_1
+    assert (
+        custom_copied_battle.trainer_0.pokemon_team[0]
+        is not battle_instance.trainer_0.pokemon_team[0]
+    )
+    assert (
+        custom_copied_battle.trainer_1.pokemon_team[0]
+        is not battle_instance.trainer_1.pokemon_team[0]
+    )
+
+    # Ensure all relevant attributes are deeply copied and equal
+    assert custom_copied_battle.round == battle_instance.round
+    assert custom_copied_battle.winner == battle_instance.winner
+    assert custom_copied_battle.tie == battle_instance.tie
+    assert custom_copied_battle.history == battle_instance.history
+
+    # Check trainer details
+    assert custom_copied_battle.trainer_0.name == battle_instance.trainer_0.name
+    assert len(custom_copied_battle.trainer_0.pokemon_team) == len(
+        battle_instance.trainer_0.pokemon_team
+    )
+    assert (
+        custom_copied_battle.trainer_0.pokemon_team[0].hp
+        == battle_instance.trainer_0.pokemon_team[0].hp
+    )
+    assert (
+        custom_copied_battle.trainer_0.pokemon_team[0]._pp
+        == battle_instance.trainer_0.pokemon_team[0]._pp
+    )
+
+
+def test_battle_deepcopy_performance(benchmark, battle_instance):
+    """Benchmarks the deepcopy method."""
+    # Benchmark deepcopy
+    deep_copied_battle = benchmark(copy.deepcopy, battle_instance)
+
+    # Assertions for deep_copied_battle
+    assert deep_copied_battle is not battle_instance
+    assert deep_copied_battle.trainer_0 is not battle_instance.trainer_0
+    assert deep_copied_battle.trainer_1 is not battle_instance.trainer_1
+    assert (
+        deep_copied_battle.trainer_0.pokemon_team[0]
+        is not battle_instance.trainer_0.pokemon_team[0]
+    )
+    assert (
+        deep_copied_battle.trainer_1.pokemon_team[0]
+        is not battle_instance.trainer_1.pokemon_team[0]
+    )
+
+    assert deep_copied_battle.round == battle_instance.round
+    assert deep_copied_battle.winner == battle_instance.winner
+    assert deep_copied_battle.tie == battle_instance.tie
+    assert deep_copied_battle.history == battle_instance.history
+
+    assert deep_copied_battle.trainer_0.name == battle_instance.trainer_0.name
+    assert len(deep_copied_battle.trainer_0.pokemon_team) == len(
+        battle_instance.trainer_0.pokemon_team
+    )
+    assert (
+        deep_copied_battle.trainer_0.pokemon_team[0].hp
+        == battle_instance.trainer_0.pokemon_team[0].hp
+    )
+    assert (
+        deep_copied_battle.trainer_0.pokemon_team[0]._pp
+        == battle_instance.trainer_0.pokemon_team[0]._pp
+    )
 
 
 def test_performance_tensor_creation(benchmark, battle_instance):

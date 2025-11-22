@@ -112,6 +112,20 @@ class Pokemon:
         }
         self._pp = [move.pp for move in self.moves]
 
+    def copy(self):
+        cls = self.__class__
+        new_pokemon = cls.__new__(cls)
+        for k, v in self.__dict__.items():
+            if k == "_modifiers":
+                new_pokemon._modifiers = v.copy()
+            elif k == "_pp":
+                new_pokemon._pp = v.copy()
+            elif k == "types":
+                new_pokemon.types = v.copy()
+            else:
+                setattr(new_pokemon, k, v)
+        return new_pokemon
+
     def validate_inputs(self):
         if not isinstance(self.pokemon_id, int) or self.pokemon_id < 0:
             raise PokemonError("Pokemon ID must be a positive integer")
@@ -364,7 +378,12 @@ class Pikachu(Pokemon):
     base_sp_defense: int = 50
     base_speed: int = 90
     moves: list[Move] = field(
-        default_factory=lambda: [MoveAccessor.Scratch, MoveAccessor.ThunderShock]
+        default_factory=lambda: [
+            MoveAccessor.ThunderShock,
+            MoveAccessor.Growl,
+            MoveAccessor.QuickAttack,
+            MoveAccessor.TailWhip,
+        ]
     )
 
     __repr__ = Pokemon.__repr__
@@ -384,7 +403,9 @@ class Chimchar(Pokemon):
     base_sp_attack: int = 58
     base_sp_defense: int = 44
     base_speed: int = 61
-    moves: list[Move] = field(default_factory=lambda: [MoveAccessor.Scratch])
+    moves: list[Move] = field(
+        default_factory=lambda: [MoveAccessor.Scratch, MoveAccessor.Ember]
+    )
 
     __repr__ = Pokemon.__repr__
     __str__ = Pokemon.__str__
@@ -403,14 +424,207 @@ class Piplup(Pokemon):
     base_sp_attack: int = 61
     base_sp_defense: int = 56
     base_speed: int = 40
-    moves: list[Move] = field(default_factory=lambda: [MoveAccessor.Scratch])
+    moves: list[Move] = field(
+        default_factory=lambda: [
+            MoveAccessor.Pound,
+            MoveAccessor.WaterGun,
+            MoveAccessor.Growl,
+        ]
+    )
 
     __repr__ = Pokemon.__repr__
     __str__ = Pokemon.__str__
     __hash__ = Pokemon.__hash__
 
 
-POKEMON_LIST = [Pikachu, Chimchar, Piplup]
+@dataclass
+class Bulbasaur(Pokemon):
+    level: int = 5
+    pokemon_id: int = 3
+    name: str = "bulbasaur"
+    types: set = field(default_factory=lambda: [PokemonTypeAccessor.Grass])
+    base_hp: int = 45
+    base_attack: int = 49
+    base_defense: int = 49
+    base_sp_attack: int = 65
+    base_sp_defense: int = 65
+    base_speed: int = 45
+    moves: list[Move] = field(
+        default_factory=lambda: [
+            MoveAccessor.Tackle,
+            MoveAccessor.Growl,
+            MoveAccessor.VineWhip,
+        ]
+    )
+
+    __repr__ = Pokemon.__repr__
+    __str__ = Pokemon.__str__
+    __hash__ = Pokemon.__hash__
+
+
+@dataclass
+class Charmander(Pokemon):
+    level: int = 5
+    pokemon_id: int = 4
+    name: str = "charmander"
+    types: set = field(default_factory=lambda: [PokemonTypeAccessor.Fire])
+    base_hp: int = 39
+    base_attack: int = 52
+    base_defense: int = 43
+    base_sp_attack: int = 60
+    base_sp_defense: int = 50
+    base_speed: int = 65
+    moves: list[Move] = field(
+        default_factory=lambda: [
+            MoveAccessor.Scratch,
+            MoveAccessor.Growl,
+            MoveAccessor.Ember,
+        ]
+    )
+
+    __repr__ = Pokemon.__repr__
+    __str__ = Pokemon.__str__
+    __hash__ = Pokemon.__hash__
+
+
+@dataclass
+class Squirtle(Pokemon):
+    level: int = 5
+    pokemon_id: int = 5
+    name: str = "squirtle"
+    types: set = field(default_factory=lambda: [PokemonTypeAccessor.Water])
+    base_hp: int = 44
+    base_attack: int = 48
+    base_defense: int = 65
+    base_sp_attack: int = 50
+    base_sp_defense: int = 64
+    base_speed: int = 43
+    moves: list[Move] = field(
+        default_factory=lambda: [
+            MoveAccessor.Tackle,
+            MoveAccessor.TailWhip,
+            MoveAccessor.WaterGun,
+        ]
+    )
+
+    __repr__ = Pokemon.__repr__
+    __str__ = Pokemon.__str__
+    __hash__ = Pokemon.__hash__
+
+
+@dataclass
+class Pidgey(Pokemon):
+    level: int = 5
+    pokemon_id: int = 6
+    name: str = "pidgey"
+    types: set = field(
+        default_factory=lambda: [PokemonTypeAccessor.Normal, PokemonTypeAccessor.Flying]
+    )
+    base_hp: int = 40
+    base_attack: int = 45
+    base_defense: int = 40
+    base_sp_attack: int = 35
+    base_sp_defense: int = 35
+    base_speed: int = 56
+    moves: list[Move] = field(
+        default_factory=lambda: [
+            MoveAccessor.Tackle,
+            MoveAccessor.SandAttack,
+            MoveAccessor.QuickAttack,
+        ]
+    )
+
+    __repr__ = Pokemon.__repr__
+    __str__ = Pokemon.__str__
+    __hash__ = Pokemon.__hash__
+
+
+@dataclass
+class Rattata(Pokemon):
+    level: int = 5
+    pokemon_id: int = 7
+    name: str = "rattata"
+    types: set = field(default_factory=lambda: [PokemonTypeAccessor.Normal])
+    base_hp: int = 30
+    base_attack: int = 56
+    base_defense: int = 35
+    base_sp_attack: int = 25
+    base_sp_defense: int = 35
+    base_speed: int = 72
+    moves: list[Move] = field(
+        default_factory=lambda: [
+            MoveAccessor.Tackle,
+            MoveAccessor.TailWhip,
+            MoveAccessor.QuickAttack,
+        ]
+    )
+
+    __repr__ = Pokemon.__repr__
+    __str__ = Pokemon.__str__
+    __hash__ = Pokemon.__hash__
+
+
+@dataclass
+class Sandshrew(Pokemon):
+    level: int = 5
+    pokemon_id: int = 8
+    name: str = "sandshrew"
+    types: set = field(default_factory=lambda: [PokemonTypeAccessor.Ground])
+    base_hp: int = 50
+    base_attack: int = 75
+    base_defense: int = 85
+    base_sp_attack: int = 20
+    base_sp_defense: int = 30
+    base_speed: int = 40
+    moves: list[Move] = field(
+        default_factory=lambda: [
+            MoveAccessor.Scratch,
+            MoveAccessor.SandAttack,
+        ]
+    )
+
+    __repr__ = Pokemon.__repr__
+    __str__ = Pokemon.__str__
+    __hash__ = Pokemon.__hash__
+
+
+@dataclass
+class Eevee(Pokemon):
+    level: int = 5
+    pokemon_id: int = 9
+    name: str = "eevee"
+    types: set = field(default_factory=lambda: [PokemonTypeAccessor.Normal])
+    base_hp: int = 55
+    base_attack: int = 55
+    base_defense: int = 50
+    base_sp_attack: int = 45
+    base_sp_defense: int = 65
+    base_speed: int = 55
+    moves: list[Move] = field(
+        default_factory=lambda: [
+            MoveAccessor.Tackle,
+            MoveAccessor.TailWhip,
+            MoveAccessor.SandAttack,
+        ]
+    )
+
+    __repr__ = Pokemon.__repr__
+    __str__ = Pokemon.__str__
+    __hash__ = Pokemon.__hash__
+
+
+POKEMON_LIST = [
+    Pikachu,
+    Chimchar,
+    Piplup,
+    Bulbasaur,
+    Charmander,
+    Squirtle,
+    Pidgey,
+    Rattata,
+    Sandshrew,
+    Eevee,
+]
 
 POKEMON_MAP = {pokemon.name: pokemon for pokemon in POKEMON_LIST}
 

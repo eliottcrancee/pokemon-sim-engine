@@ -17,7 +17,7 @@ def sample_trainer():
     return Trainer(
         name="Ash",
         pokemon_team=[pikachu, chimchar],
-        inventory={ItemAccessor.Potion: potion},
+        inventory={potion.name: potion},
     )
 
 
@@ -26,8 +26,8 @@ def test_trainer_initialization(sample_trainer):
     assert sample_trainer.name == "Ash"
     assert len(sample_trainer.pokemon_team) == 2
     assert sample_trainer.pokemon_team[0].name == "pikachu"
-    assert ItemAccessor.Potion in sample_trainer.inventory
-    assert sample_trainer.inventory[ItemAccessor.Potion].quantity == 2
+    assert ItemAccessor.Potion().name in sample_trainer.inventory
+    assert sample_trainer.inventory[ItemAccessor.Potion().name].quantity == 2
 
 
 def test_switch_pokemon(sample_trainer):

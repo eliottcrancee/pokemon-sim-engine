@@ -160,36 +160,28 @@ class Move:
         return MOVE_ONE_HOT_DESCRIPTION
 
 
-########## Define moves ##########
+class StatModifyingMove(Move):
+    def __init__(self, move_id, name, type, pp, stat, stages, self_target=False):
+        super().__init__(move_id, name, MoveCategory.Status, type, 0, 100, pp)
+        self.stat = stat
+        self.stages = stages
+        self.self_target = self_target
 
-SelfHit = Move(
-    0, "Self Hit", MoveCategory.Physical, PokemonTypeAccessor.TypeNone, 40, 100, 1
-)
-Tackle = Move(
-    1, "Tackle", MoveCategory.Physical, PokemonTypeAccessor.Normal, 35, 95, 35
-)
-Scratch = Move(
-    2, "Scratch", MoveCategory.Physical, PokemonTypeAccessor.Normal, 40, 100, 35
-)
-RazorLeaf = Move(
-    3, "Razor Leaf", MoveCategory.Physical, PokemonTypeAccessor.Grass, 55, 95, 25
-)
-Pound = Move(4, "Pound", MoveCategory.Physical, PokemonTypeAccessor.Normal, 40, 100, 35)
-ThunderShock = Move(
-    5,
-    "Thunder Shock",
-    MoveCategory.Physical,
-    PokemonTypeAccessor.Electric,
-    40,
-    100,
-    30,
-)
+    def secondary_effect(
+        self, user, target, damage, base_damage, critical, stab, effectiveness
+    ) -> list[Message]:
+        affected = user if self.self_target else target
+        affected.apply_modifier(self.stat, self.stages)
+        direction = "rose" if self.stages > 0 else "fell"
+        if abs(self.stages) > 1:
+            direction = "sharply " + direction
+        return [Message(f"{affected.surname}'s {self.stat} {direction}!")]
 
 
 class StruggleMove(Move):
     def __init__(self):
         super().__init__(
-            6,
+            1,
             "Struggle",
             MoveCategory.Physical,
             PokemonTypeAccessor.Normal,
@@ -215,11 +207,104 @@ class StruggleMove(Move):
         return [Message(f"{user.surname} lost {lose_hp} HP.")]
 
 
+########## Define moves ##########
+
+# --- System Moves ---
+SelfHit = Move(
+    0, "Self Hit", MoveCategory.Physical, PokemonTypeAccessor.TypeNone, 40, 100, 1
+)
 Struggle = StruggleMove()
+
+# --- Physical Moves ---
+Tackle = Move(
+    2, "Tackle", MoveCategory.Physical, PokemonTypeAccessor.Normal, 35, 95, 35
+)
+Scratch = Move(
+    3, "Scratch", MoveCategory.Physical, PokemonTypeAccessor.Normal, 40, 100, 35
+)
+Pound = Move(4, "Pound", MoveCategory.Physical, PokemonTypeAccessor.Normal, 40, 100, 35)
+Peck = Move(5, "Peck", MoveCategory.Physical, PokemonTypeAccessor.Flying, 35, 100, 35)
+VineWhip = Move(
+    6, "Vine Whip", MoveCategory.Physical, PokemonTypeAccessor.Grass, 35, 100, 10
+)
+RazorLeaf = Move(
+    7, "Razor Leaf", MoveCategory.Physical, PokemonTypeAccessor.Grass, 55, 95, 25
+)
+QuickAttack = Move(
+    8, "Quick Attack", MoveCategory.Physical, PokemonTypeAccessor.Normal, 40, 100, 30
+)
+WingAttack = Move(
+    9, "Wing Attack", MoveCategory.Physical, PokemonTypeAccessor.Flying, 35, 100, 35
+)
+Earthquake = Move(
+    10, "Earthquake", MoveCategory.Physical, PokemonTypeAccessor.Ground, 100, 100, 10
+)
+
+# --- Special Moves ---
+ThunderShock = Move(
+    11,
+    "Thunder Shock",
+    MoveCategory.Special,
+    PokemonTypeAccessor.Electric,
+    40,
+    100,
+    30,
+)
+Ember = Move(12, "Ember", MoveCategory.Special, PokemonTypeAccessor.Fire, 40, 100, 25)
+WaterGun = Move(
+    13, "Water Gun", MoveCategory.Special, PokemonTypeAccessor.Water, 40, 100, 25
+)
+Flamethrower = Move(
+    14, "Flamethrower", MoveCategory.Special, PokemonTypeAccessor.Fire, 95, 100, 15
+)
+HydroPump = Move(
+    15, "Hydro Pump", MoveCategory.Special, PokemonTypeAccessor.Water, 120, 80, 5
+)
+Thunderbolt = Move(
+    16, "Thunderbolt", MoveCategory.Special, PokemonTypeAccessor.Electric, 95, 100, 15
+)
+Psychic = Move(
+    17, "Psychic", MoveCategory.Special, PokemonTypeAccessor.Psychic, 90, 100, 10
+)
+
+# --- Status Moves ---
+Growl = StatModifyingMove(18, "Growl", PokemonTypeAccessor.Normal, 40, "attack", -1)
+TailWhip = StatModifyingMove(
+    19, "Tail Whip", PokemonTypeAccessor.Normal, 30, "defense", -1
+)
+SandAttack = StatModifyingMove(
+    20, "Sand Attack", PokemonTypeAccessor.Ground, 15, "accuracy", -1
+)
+Agility = StatModifyingMove(
+    21, "Agility", PokemonTypeAccessor.Psychic, 30, "speed", 2, self_target=True
+)
 
 ########## ################# ##########
 
-MOVE_LIST = [SelfHit, Tackle, Scratch, RazorLeaf, Pound, ThunderShock, Struggle]
+MOVE_LIST = [
+    SelfHit,
+    Struggle,
+    Tackle,
+    Scratch,
+    Pound,
+    Peck,
+    VineWhip,
+    RazorLeaf,
+    QuickAttack,
+    WingAttack,
+    Earthquake,
+    ThunderShock,
+    Ember,
+    WaterGun,
+    Flamethrower,
+    HydroPump,
+    Thunderbolt,
+    Psychic,
+    Growl,
+    TailWhip,
+    SandAttack,
+    Agility,
+]
 MOVE_MAP = {move.name.replace(" ", "").lower(): move for move in MOVE_LIST}
 
 assert len({move.move_id for move in MOVE_LIST}) == len(MOVE_LIST), "Duplicate Move IDs"

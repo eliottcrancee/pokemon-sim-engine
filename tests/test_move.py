@@ -30,8 +30,7 @@ def test_move_creation_and_representation():
     assert tackle.category == MoveCategory.Physical
     assert tackle.type == PokemonTypeAccessor.Normal
     assert str(tackle) == "Tackle | Type: Normal | PP: 35/35"
-    assert "Move(id=1, name=Tackle" in repr(tackle)
-
+    assert "Move(id=2, name=Tackle" in repr(tackle)
 
 def test_damage_calculation(pokemon_instances):
     """Tests the damage calculation for a move.

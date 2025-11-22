@@ -39,7 +39,7 @@ COLOR_FADED = Fore.BLACK + Style.BRIGHT
 
 def strip_ansi(text: str) -> str:
     """Removes ANSI escape codes from a string."""
-    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
+    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|[[0-?]*[ -/]*[@-~])")
     return ansi_escape.sub("", text)
 
 
@@ -211,6 +211,12 @@ def play_ui(battle: Battle, agent_0: BaseAgent, agent_1: BaseAgent):
         maxlen=MESSAGE_BOX_HEIGHT * 2
     )  # Keep more history than displayed
 
+    def hide_cursor():
+        print("\033[?25l", end="")
+
+    def show_cursor():
+        print("\033[?25h", end="")
+
     def add_message(msg: str):
         message_history.append(msg)
 
@@ -240,7 +246,9 @@ def play_ui(battle: Battle, agent_0: BaseAgent, agent_1: BaseAgent):
             msgs_to_display.append(streaming_text)
 
         ui_lines.extend(
-            display_message_box(msgs_to_display)
+            display_message_box(
+                msgs_to_display
+            )
         )  # Display only the most recent messages that fit
 
         # Pad lines to ensure we overwrite previous content
@@ -272,172 +280,164 @@ def play_ui(battle: Battle, agent_0: BaseAgent, agent_1: BaseAgent):
         # Final render to commit message to history, overwriting
         render_ui(clear=False)
 
-    battle.reset()
-    # Clear screen once at the very beginning
-    clear_screen()
-    animate_message(
-        f"Battle started: {battle.trainer_0.name} vs {battle.trainer_1.name}!"
-    )
-    time.sleep(1)
-
-    while not battle.done:
-        # Get actions
-        action_0 = None
-        action_1 = None
-
-        # Trainer 0's action
-        if isinstance(agent_0, InputAgent):
-            possible_actions = battle.get_possible_actions(0)
-            selected_index = 0
-            while action_0 is None:
-                clear_screen()
-                ui_lines = []
-                ui_lines.extend(
-                    display_trainer_info(battle.trainer_1, is_opponent=True)
-                )
-                ui_lines.extend(
-                    display_pokemon_stats(
-                        battle.trainer_1.pokemon_team[0], is_opponent=True
-                    )
-                )
-                ui_lines.append("")
-                ui_lines.extend(display_pokemon_stats(battle.trainer_0.pokemon_team[0]))
-                ui_lines.extend(display_trainer_info(battle.trainer_0))
-                ui_lines.append("")
-                ui_lines.extend(
-                    display_message_box(
-                        deque(list(message_history)[-MESSAGE_BOX_HEIGHT + 2 :])
-                    )
-                )
-                ui_lines.extend(display_action_menu(possible_actions, selected_index))
-
-                for line in ui_lines:
-                    print(line)
-
-                # Handle input for menu navigation
-                # This part is tricky for a simple CLI. A more robust solution would use a library like curses.
-                # For now, let's simulate a basic input loop.
-                print(
-                    f"{COLOR_MENU}Use Z/S to navigate, E to select, A to quit.{Style.RESET_ALL}"
-                )
-                choice = input("Your move: ").lower()
-
-                # Clear screen immediately to remove input line and menu before next render
-                clear_screen()
-
-                if choice == "z":
-                    selected_index = (selected_index - 1) % len(possible_actions)
-                elif choice == "s":
-                    selected_index = (selected_index + 1) % len(possible_actions)
-                elif choice == "e":
-                    action_0 = possible_actions[selected_index]
-                elif choice == "a":
-                    animate_message(
-                        f"{COLOR_ERROR}Player quit the battle.{Style.RESET_ALL}"
-                    )
-                    battle.winner = 1  # Opponent wins if player quits
-                    break
-                else:
-                    animate_message(
-                        f"{COLOR_WARNING}Invalid input. Please use Z, S, E, or A.{Style.RESET_ALL}"
-                    )
-                    time.sleep(0.5)  # Give user time to read warning
-        else:
-            action_0 = agent_0.get_action(battle, 0)
-            animate_message(f"{battle.trainer_0.name} chose {action_0.description}")
-            time.sleep(0.5)  # Small delay for AI action
-
-        if battle.done:  # Check if player quit
-            break
-
-        # Trainer 1's action
-        if isinstance(agent_1, InputAgent):
-            possible_actions = battle.get_possible_actions(1)
-            selected_index = 0
-            while action_1 is None:
-                clear_screen()
-                ui_lines = []
-                ui_lines.extend(
-                    display_trainer_info(battle.trainer_1, is_opponent=True)
-                )
-                ui_lines.extend(
-                    display_pokemon_stats(
-                        battle.trainer_1.pokemon_team[0], is_opponent=True
-                    )
-                )
-                ui_lines.append("")
-                ui_lines.extend(display_pokemon_stats(battle.trainer_0.pokemon_team[0]))
-                ui_lines.extend(display_trainer_info(battle.trainer_0))
-                ui_lines.append("")
-                ui_lines.extend(
-                    display_message_box(
-                        deque(list(message_history)[-MESSAGE_BOX_HEIGHT + 2 :])
-                    )
-                )
-                ui_lines.extend(display_action_menu(possible_actions, selected_index))
-
-                for line in ui_lines:
-                    print(line)
-
-                print(
-                    f"{COLOR_MENU}Use Z/S to navigate, E to select, A to quit.{Style.RESET_ALL}"
-                )
-                choice = input("Your move: ").lower()
-
-                # Clear screen immediately to remove input line and menu before next render
-                clear_screen()
-
-                if choice == "z":
-                    selected_index = (selected_index - 1) % len(possible_actions)
-                elif choice == "s":
-                    selected_index = (selected_index + 1) % len(possible_actions)
-                elif choice == "e":
-                    action_1 = possible_actions[selected_index]
-                elif choice == "a":
-                    animate_message(
-                        f"{COLOR_ERROR}Player quit the battle.{Style.RESET_ALL}"
-                    )
-                    battle.winner = 0  # Opponent wins if player quits
-                    break
-                else:
-                    animate_message(
-                        f"{COLOR_WARNING}Invalid input. Please use Z, S, E, or A.{Style.RESET_ALL}"
-                    )
-                    time.sleep(0.5)
-        else:
-            action_1 = agent_1.get_action(battle, 1)
-            animate_message(f"{battle.trainer_1.name} chose {action_1.description}")
-            time.sleep(0.5)  # Small delay for AI action
-
-        if battle.done:  # Check if player quit
-            break
-
-        # Execute turn
-        turn_messages = battle.turn(action_0, action_1)
-        for msg in turn_messages:
-            animate_message(str(msg))
-            time.sleep(1.0)  # Delay for message readability
-
-        # After turn, check for fainted Pokémon and switch if necessary
-        # This logic is already handled within battle.turn, but we might want to
-        # add specific messages or delays for switches here if battle.turn doesn't
-        # provide enough granularity. For now, rely on battle.turn's messages.
-
-        render_ui()  # Final render after all messages for the turn
-        time.sleep(1)  # Pause before next turn
-
-    # Battle ended
-    clear_screen()
-
-    if battle.tie:
-        animate_message(f"{COLOR_WARNING}The battle ended in a tie!{Style.RESET_ALL}")
-    elif battle.winner == 0:
+    hide_cursor()
+    try:
+        battle.reset()
+        # Clear screen once at the very beginning
+        clear_screen()
         animate_message(
-            f"{COLOR_TRAINER_NAME}{battle.trainer_0.name}{Style.RESET_ALL} wins the battle!"
-        )
-    elif battle.winner == 1:
-        animate_message(
-            f"{COLOR_TRAINER_NAME}{battle.trainer_1.name}{Style.RESET_ALL} wins the battle!"
+            f"Battle started: {battle.trainer_0.name} vs {battle.trainer_1.name}!"
         )
 
-    time.sleep(2)  # Final pause
+        while not battle.done:
+            # Get actions
+            action_0 = None
+            action_1 = None
+
+            # Trainer 0's action
+            if isinstance(agent_0, InputAgent):
+                possible_actions = battle.get_possible_actions(0)
+                selected_index = 0
+                while action_0 is None:
+                    clear_screen()
+                    ui_lines = []
+                    ui_lines.extend(
+                        display_trainer_info(battle.trainer_1, is_opponent=True)
+                    )
+                    ui_lines.extend(
+                        display_pokemon_stats(
+                            battle.trainer_1.pokemon_team[0], is_opponent=True
+                        )
+                    )
+                    ui_lines.append("")
+                    ui_lines.extend(
+                        display_pokemon_stats(battle.trainer_0.pokemon_team[0])
+                    )
+                    ui_lines.extend(display_trainer_info(battle.trainer_0))
+                    ui_lines.append("")
+                    ui_lines.extend(
+                        display_message_box(
+                            deque(list(message_history)[-MESSAGE_BOX_HEIGHT + 2 :])
+                        )
+                    )
+                    ui_lines.extend(
+                        display_action_menu(possible_actions, selected_index)
+                    )
+
+                    for line in ui_lines:
+                        print(line)
+
+                    # Handle input for menu navigation
+                    print(f"{COLOR_MENU}Use Z/S to navigate, E to select, A to quit.{Style.RESET_ALL}")
+                    choice = input().lower()
+
+                    if choice == "z":
+                        selected_index = (selected_index - 1) % len(possible_actions)
+                    elif choice == "s":
+                        selected_index = (selected_index + 1) % len(possible_actions)
+                    elif choice == "e":
+                        action_0 = possible_actions[selected_index]
+                    elif choice == "a":
+                        animate_message(
+                            f"{COLOR_ERROR}Player quit the battle.{Style.RESET_ALL}"
+                        )
+                        battle.winner = 1  # Opponent wins if player quits
+                        break
+                    else:
+                        animate_message(
+                            f"{COLOR_WARNING}Invalid input. Please use Z, S, E, or A.{Style.RESET_ALL}"
+                        )
+                        time.sleep(0.5)  # Give user time to read warning
+            else:
+                action_0 = agent_0.get_action(battle, 0, verbose=True)
+
+            if battle.done:  # Check if player quit
+                break
+
+            # Trainer 1's action
+            if isinstance(agent_1, InputAgent):
+                possible_actions = battle.get_possible_actions(1)
+                selected_index = 0
+                while action_1 is None:
+                    clear_screen()
+                    ui_lines = []
+                    ui_lines.extend(
+                        display_trainer_info(battle.trainer_1, is_opponent=True)
+                    )
+                    ui_lines.extend(
+                        display_pokemon_stats(
+                            battle.trainer_1.pokemon_team[0], is_opponent=True
+                        )
+                    )
+                    ui_lines.append("")
+                    ui_lines.extend(
+                        display_pokemon_stats(battle.trainer_0.pokemon_team[0])
+                    )
+                    ui_lines.extend(display_trainer_info(battle.trainer_0))
+                    ui_lines.append("")
+                    ui_lines.extend(
+                        display_message_box(
+                            deque(list(message_history)[-MESSAGE_BOX_HEIGHT + 2 :])
+                        )
+                    )
+                    ui_lines.extend(
+                        display_action_menu(possible_actions, selected_index)
+                    )
+
+                    for line in ui_lines:
+                        print(line)
+
+                    print(f"{COLOR_MENU}Use Z/S to navigate, E to select, A to quit.{Style.RESET_ALL}")
+                    choice = input().lower()
+
+                    if choice == "z":
+                        selected_index = (selected_index - 1) % len(possible_actions)
+                    elif choice == "s":
+                        selected_index = (selected_index + 1) % len(possible_actions)
+                    elif choice == "e":
+                        action_1 = possible_actions[selected_index]
+                    elif choice == "a":
+                        animate_message(
+                            f"{COLOR_ERROR}Player quit the battle.{Style.RESET_ALL}"
+                        )
+                        battle.winner = 0  # Opponent wins if player quits
+                        break
+                    else:
+                        animate_message(
+                            f"{COLOR_WARNING}Invalid input. Please use Z, S, E, or A.{Style.RESET_ALL}"
+                        )
+                        time.sleep(0.5)  # Give user time to read warning
+            else:
+                action_1 = agent_1.get_action(battle, 1, verbose=True)
+
+            if battle.done:  # Check if player quit
+                break
+
+            # Execute turn
+            turn_messages = battle.turn(action_0, action_1)
+            for msg in turn_messages:
+                animate_message(str(msg))
+                time.sleep(1.0)  # Delay for message readability
+
+            render_ui()  # Final render after all messages for the turn
+            time.sleep(1)  # Pause before next turn
+
+        # Battle ended
+        clear_screen()
+
+        if battle.tie:
+            animate_message(
+                f"{COLOR_WARNING}The battle ended in a tie!{Style.RESET_ALL}"
+            )
+        elif battle.winner == 0:
+            animate_message(
+                f"{COLOR_TRAINER_NAME}{battle.trainer_0.name}{Style.RESET_ALL} wins the battle!"
+            )
+        elif battle.winner == 1:
+            animate_message(
+                f"{COLOR_TRAINER_NAME}{battle.trainer_1.name}{Style.RESET_ALL} wins the battle!"
+            )
+
+        time.sleep(2)  # Final pause
+    finally:
+        show_cursor()

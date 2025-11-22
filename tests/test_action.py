@@ -19,7 +19,9 @@ def trainers():
             PokemonAccessor.Pikachu(level=10),
             PokemonAccessor.Chimchar(level=12),
         ],
-        inventory={ItemAccessor.Potion(): ItemAccessor.Potion(default_quantity=2)},
+        inventory={
+            ItemAccessor.Potion().name: ItemAccessor.Potion(default_quantity=2)
+        },
     )
     opponent = Trainer(
         name="Gary",
@@ -69,7 +71,7 @@ def test_use_item_action(trainers):
     """Tests the creation and execution of an USE_ITEM action."""
     trainer, _ = trainers
     trainer.pokemon_team[1].hp -= 10  # Damage the pokemon to use a potion
-    item = trainer.inventory[ItemAccessor.Potion()]
+    item = trainer.inventory[ItemAccessor.Potion().name]
 
     action = Action(
         action_type=ActionType.USE_ITEM,
@@ -119,8 +121,7 @@ def test_action_one_hot_encoding(trainers):
     attack_one_hot = attack_action.one_hot
     assert isinstance(attack_one_hot, torch.Tensor)
     assert attack_one_hot[0] == 1  # Attack type
-    assert attack_one_hot[3 + MoveAccessor.Scratch.move_id] == 1  # Move
-
+    assert attack_one_hot[3 + MoveAccessor.ThunderShock.move_id] == 1  # Move
     # Switch
     switch_action = Action(
         action_type=ActionType.SWITCH, trainer=trainer, target_index=1
@@ -133,7 +134,7 @@ def test_action_one_hot_encoding(trainers):
         action_type=ActionType.USE_ITEM,
         trainer=trainer,
         target_index=1,
-        item=trainer.inventory[ItemAccessor.Potion()],
+        item=trainer.inventory[ItemAccessor.Potion().name],
     )
     item_one_hot = item_action.one_hot
     assert item_one_hot[2] == 1  # Use Item type
@@ -156,7 +157,7 @@ def test_performance_one_hot(benchmark, trainers):
         action_type=ActionType.USE_ITEM,
         trainer=trainer,
         target_index=1,
-        item=trainer.inventory[ItemAccessor.Potion()],
+        item=trainer.inventory[ItemAccessor.Potion().name],
     )
 
     def get_all_one_hots():

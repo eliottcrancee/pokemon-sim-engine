@@ -20,7 +20,7 @@ def battle_generator(randomize=False):
     ash = Trainer(
         name="Ash",
         pokemon_team=[pikachu_ash, charmander_ash],
-        inventory={ItemAccessor.Potion: potion_ash},
+        inventory={potion_ash.name: potion_ash},
     )
 
     squirtle_gary = PokemonAccessor.Pikachu(level=10)
@@ -30,7 +30,7 @@ def battle_generator(randomize=False):
     gary = Trainer(
         name="Gary",
         pokemon_team=[squirtle_gary, bulbasaur_gary],
-        inventory={ItemAccessor.Potion: potion_gary},
+        inventory={potion_gary.name: potion_gary},
     )
 
     return Battle(trainer_0=ash, trainer_1=gary, max_rounds=100)
