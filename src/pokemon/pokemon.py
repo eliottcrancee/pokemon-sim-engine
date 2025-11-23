@@ -1,17 +1,11 @@
 # pokemon.py
 
-import os
 import random
-import sys
 from dataclasses import dataclass, field
-from enum import Enum, auto
 from functools import cached_property
 
 import torch
 from pympler import asizeof
-
-# Ensure current working directory is in path
-sys.path.append(os.getcwd())  # nopep8
 
 from pokemon.config import DEBUG
 from pokemon.message import Message
@@ -30,15 +24,15 @@ class PokemonError(Exception):
         self.message = message
 
 
-class PokemonStatus(Enum):
-    Healthy = auto()
-    Burn = auto()
+class PokemonStatusValue:
+    """Class representing a value in the PokemonStatus enum."""
 
-    def __repr__(self):
-        return f"PokemonStatus.{self.name}"
+    def __init__(self, value: int, name: str):
+        self.value = value
+        self.name = name
 
     def __str__(self):
-        return self.name.capitalize()
+        return self.name
 
     def __eq__(self, other):
         return self.value == other.value
@@ -52,14 +46,21 @@ class PokemonStatus(Enum):
         return POKEMON_STATUS_ONE_HOT_DESCRIPTION
 
 
-STATUS_LIST = [status for status in PokemonStatus]
-STATUS_MAP = {status.name: status for status in PokemonStatus}
+class PokemonStatus:
+    """Enum for Pokemon statuses."""
+
+    Healthy = PokemonStatusValue(0, "Healthy")
+    Burn = PokemonStatusValue(1, "Burn")
+
+
+STATUS_LIST = [PokemonStatus.Healthy, PokemonStatus.Burn]
+STATUS_MAP = {status.name: status for status in STATUS_LIST}
 
 POKEMON_STATUS_ONE_HOT_DESCRIPTION = ["Status Padding"] + [
-    status.name.capitalize() for status in PokemonStatus
+    status.name.capitalize() for status in STATUS_LIST
 ]
 
-POKEMON_STATUS_ONE_HOT_PADDING = torch.tensor([1] + [0] * len(PokemonStatus))
+POKEMON_STATUS_ONE_HOT_PADDING = torch.tensor([1] + [0] * len(STATUS_LIST))
 
 
 @dataclass

@@ -37,7 +37,7 @@ uv sync
 To jump straight into a battle between Ash and Gary:
 
 ```bash
-uv run python run_ui_battle.py
+uv run python src/quick_start.py
 ```
 
 ![UI Example](ui.png)

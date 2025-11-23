@@ -1,17 +1,11 @@
 # move.py
 
-import os
 import random
-import sys
 from dataclasses import dataclass
-from enum import Enum, auto
 from functools import cached_property
 
 import torch
 from pympler import asizeof
-
-# Ensure current working directory is in path
-sys.path.append(os.getcwd())
 
 from pokemon.config import DEBUG
 from pokemon.message import Message
@@ -53,8 +47,6 @@ class MoveCategory:
 
 @dataclass
 class Move:
-    """Dataclass representing a Pokémon move with attributes and methods."""
-
     move_id: int
     name: str
     category: MoveCategoryValue

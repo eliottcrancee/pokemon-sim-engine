@@ -4,7 +4,7 @@ import sys
 # Ensure src directory is in path
 sys.path.append(os.path.join(os.getcwd(), "src"))
 
-from pokemon.agent import InputAgent
+from pokemon.agent import InputAgent, OneStepUniformExpectimaxAgent
 from pokemon.battle import Battle
 from pokemon.item import ItemAccessor
 from pokemon.pokemon import PokemonAccessor
@@ -40,8 +40,8 @@ def main():
     )
 
     # Create Agents
-    ash_agent = InputAgent(name="Ash")
-    gary_agent = InputAgent(name="Gary")
+    ash_agent = InputAgent()
+    gary_agent = OneStepUniformExpectimaxAgent()
 
     # Create Battle
     battle = Battle(trainer_0=ash, trainer_1=gary, max_rounds=100)

@@ -1,15 +1,10 @@
 # trainer.py
 
-import os
-import sys
 from dataclasses import dataclass, field
 from functools import cached_property
 
 import torch
 from pympler import asizeof
-
-# Ensure current working directory is in path
-sys.path.append(os.getcwd())  # nopep8
 
 from pokemon.config import (
     DEBUG,
@@ -105,7 +100,9 @@ class Trainer:
             isinstance(k, str) and isinstance(v, Item)
             for k, v in self.inventory.items()
         ):
-            raise TrainerError("Inventory must be a dictionary of item names to Item objects.")
+            raise TrainerError(
+                "Inventory must be a dictionary of item names to Item objects."
+            )
 
     def switch_pokemon(self, new_pokemon):
         if DEBUG:

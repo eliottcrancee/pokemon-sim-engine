@@ -13,7 +13,6 @@ from pokemon.pokemon import (
 def test_pokemon_enums():
     """Tests the string representation of PokemonStatus and PokemonEnum."""
     assert str(PokemonStatus.Healthy) == "Healthy"
-    assert repr(PokemonStatus.Burn) == "PokemonStatus.Burn"
     assert PokemonAccessor.Pikachu.name.capitalize() == "Pikachu"
     assert (
         repr(PokemonAccessor)

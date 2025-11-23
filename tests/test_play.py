@@ -4,15 +4,13 @@ import pytest
 
 from pokemon.agent import BaseAgent, RandomAgent
 from pokemon.battle import Battle
+from pokemon.item import ItemAccessor
 from pokemon.play import play, play_multiple
+from pokemon.pokemon import PokemonAccessor
+from pokemon.trainer import Trainer
 
 
-def battle_generator(randomize=False):
-    from pokemon.battle import Battle
-    from pokemon.item import ItemAccessor
-    from pokemon.pokemon import PokemonAccessor
-    from pokemon.trainer import Trainer
-
+def battle_generator():
     pikachu_ash = PokemonAccessor.Pikachu(level=10)
     charmander_ash = PokemonAccessor.Chimchar(level=10)
     potion_ash = ItemAccessor.Potion(default_quantity=2)
@@ -66,11 +64,6 @@ def test_battle_generator():
     assert isinstance(battle, Battle)
     assert battle.trainer_0.name == "Ash"
     assert len(battle.trainer_0.pokemon_team) == 2
-
-    random_battle = battle_generator(randomize=True)
-    assert isinstance(random_battle, Battle)
-    # With randomization, it's hard to assert specific values,
-    # but we can check if the objects are created.
 
 
 def test_play_single_game(agents):

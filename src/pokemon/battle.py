@@ -1,23 +1,15 @@
 # battle.py
 
-import os
 import random
-import sys
 from dataclasses import dataclass
 
 import torch
-from colorama import init
-
-# Ensure current working directory is in path
-sys.path.append(os.getcwd())
 
 from pokemon.action import Action, ActionType
 from pokemon.config import DEBUG
 from pokemon.message import Message
 from pokemon.move import MoveAccessor, MoveCategory
 from pokemon.trainer import Trainer
-
-init(autoreset=True)
 
 
 @dataclass

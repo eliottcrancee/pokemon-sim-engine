@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-import os
-import sys
 from dataclasses import dataclass, field
 
 from pympler import asizeof
-
-# Ensure current working directory is in path
-sys.path.append(os.getcwd())
 
 from pokemon.config import DEBUG
 

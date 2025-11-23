@@ -31,6 +31,7 @@ dependencies = [
   "loguru>=0.7.3",
   "ruff>=0.14.4",
   "joblib>=1.5.2",
+  "numba>=0.62.1",
 ]
 
 [project.urls]

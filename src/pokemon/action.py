@@ -1,15 +1,9 @@
 # action.py
 
-import os
-import sys
 from dataclasses import dataclass
-from enum import Enum, auto
 
 import torch
 from pympler import asizeof
-
-# Ensure current working directory is in path
-sys.path.append(os.getcwd())
 
 from pokemon.config import DEBUG, MAX_POKEMON_PER_TRAINER
 from pokemon.item import ITEM_LIST, ITEM_ONE_HOT_DESCRIPTION, Item
@@ -46,6 +40,8 @@ class ActionTypeValue:
 
 
 class ActionType:
+    """Enum for Action types."""
+
     ATTACK = ActionTypeValue(0, "Attack")
     SWITCH = ActionTypeValue(1, "Switch")
     USE_ITEM = ActionTypeValue(2, "Use Item")
