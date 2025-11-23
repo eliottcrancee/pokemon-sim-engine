@@ -32,6 +32,7 @@ dependencies = [
   "ruff>=0.14.4",
   "joblib>=1.5.2",
   "numba>=0.62.1",
+  "scipy>=1.16.3",
 ]
 
 [project.urls]

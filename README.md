@@ -78,7 +78,7 @@ gary = Trainer(
 
 ```python
 from pokemon.battle import Battle
-from pokemon.agent import InputAgent, RandomAgent
+from pokemon.agents import InputAgent, RandomAgent
 
 # Initialize Battle
 battle = Battle(trainer_0=ash, trainer_1=gary, max_rounds=100)

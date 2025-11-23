@@ -4,7 +4,7 @@ import time
 
 from joblib import Parallel, cpu_count, delayed
 
-from pokemon.agent import FirstAgent
+from pokemon.agents import FirstAgent
 from pokemon.battle import Battle
 from pokemon.item import ItemAccessor
 from pokemon.pokemon import PokemonAccessor

@@ -4,7 +4,7 @@ import sys
 # Ensure src directory is in path
 sys.path.append(os.path.join(os.getcwd(), "src"))
 
-from pokemon.agent import InputAgent, OneStepUniformExpectimaxAgent
+from pokemon.agents import InputAgent, OneStepUniformExpectimaxAgent
 from pokemon.battle import Battle
 from pokemon.item import ItemAccessor
 from pokemon.pokemon import PokemonAccessor

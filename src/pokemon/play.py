@@ -5,7 +5,7 @@ import random
 from joblib import Parallel, cpu_count, delayed
 from tqdm import tqdm
 
-from pokemon.agent import BaseAgent, InputAgent
+from pokemon.agents import BaseAgent, InputAgent
 from pokemon.battle import Battle
 from pokemon.loguru_logger import logger
 
@@ -93,9 +93,9 @@ def play_tournament(
         score1 = agent1_wins / total + 0.5 * draws / total
 
         # Update Glicko-2 pour le match
-        agent0.update_rating([(agent1.r, agent1.rd, score0)])
-        agent1.update_rating([(agent0.r, agent0.rd, score1)])
+        agent0.update_rating([(agent1.rating, agent1.rating_deviation, score0)])
+        agent1.update_rating([(agent0.rating, agent0.rating_deviation, score1)])
 
-    agent_pool.sort(key=lambda a: a.r, reverse=True)
+    agent_pool.sort(key=lambda a: a.rating, reverse=True)
 
     return agent_pool

@@ -2,7 +2,7 @@
 
 import pytest
 
-from pokemon.agent import BaseAgent, RandomAgent
+from pokemon.agents import BaseAgent, RandomAgent
 from pokemon.battle import Battle
 from pokemon.item import ItemAccessor
 from pokemon.play import play, play_multiple

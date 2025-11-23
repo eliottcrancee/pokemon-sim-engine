@@ -6,7 +6,7 @@ from collections import deque
 from colorama import Fore, Style, init
 
 from pokemon.action import Action
-from pokemon.agent import BaseAgent, InputAgent
+from pokemon.agents import BaseAgent, InputAgent
 from pokemon.battle import Battle
 from pokemon.pokemon import Pokemon, PokemonStatus
 from pokemon.trainer import Trainer
