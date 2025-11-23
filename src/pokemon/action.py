@@ -27,19 +27,33 @@ class ActionError(Exception):
         self.message = message
 
 
-class ActionType(Enum):
-    ATTACK = auto()
-    SWITCH = auto()
-    USE_ITEM = auto()
+class ActionTypeValue:
+    """Class representing a value in the ActionType enum."""
+
+    def __init__(self, value: int, name: str):
+        self.value = value
+        self.name = name
+
+    def __str__(self):
+        return self.name
+
+    def __eq__(self, other):
+        return self.value == other.value
 
     @property
     def one_hot(self) -> torch.Tensor:
-        return ONEHOTCACHE.get_one_hot(3, self.value - 1)
+        return ONEHOTCACHE.get_one_hot(3, self.value)
+
+
+class ActionType:
+    ATTACK = ActionTypeValue(0, "Attack")
+    SWITCH = ActionTypeValue(1, "Switch")
+    USE_ITEM = ActionTypeValue(2, "Use Item")
 
 
 @dataclass
 class Action:
-    action_type: ActionType
+    action_type: ActionTypeValue
     trainer: Trainer
     opponent: Trainer | None = None
     move: Move | None = None
@@ -58,8 +72,8 @@ class Action:
     def validate_inputs(self):
         if not isinstance(self.trainer, Trainer):
             raise ActionError("Trainer must be an instance of Trainer")
-        if not isinstance(self.action_type, ActionType):
-            raise ActionError("Action type must be a valid ActionType")
+        if not isinstance(self.action_type, ActionTypeValue):
+            raise ActionError("Action type must be a valid ActionTypeValue")
         if self.action_type == ActionType.ATTACK:
             if not isinstance(self.move, Move):
                 raise ActionError("Move must be an instance of Move")

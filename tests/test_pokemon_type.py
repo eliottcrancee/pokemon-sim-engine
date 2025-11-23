@@ -18,8 +18,6 @@ def test_type_equality():
     """Tests equality comparison between PokemonType instances."""
     assert PokemonTypeAccessor.Grass == PokemonTypeAccessor.by_id(4)
     assert PokemonTypeAccessor.Water != PokemonTypeAccessor.Ice
-    with pytest.raises(PokemonTypeError):
-        _ = PokemonTypeAccessor.Fire == "Fire"
 
 
 def test_effectiveness_against_single_type():

@@ -6,7 +6,7 @@ from pokemon.move import (
     MOVE_LIST,
     Move,
     MoveAccessor,
-    MoveCategoryValue,
+    MoveCategory,
     PokemonTypeAccessor,
     Struggle,
 )
@@ -27,7 +27,7 @@ def test_move_creation_and_representation():
     """Tests basic move attributes and string representation."""
     tackle = MoveAccessor.Tackle
     assert tackle.name == "Tackle"
-    assert tackle.category == MoveCategoryValue.Physical
+    assert tackle.category == MoveCategory.Physical
     assert tackle.type == PokemonTypeAccessor.Normal
     assert str(tackle) == "Tackle | Type: Normal | PP: 35/35"
     assert "Move(id=2, name=Tackle" in repr(tackle)
@@ -59,7 +59,7 @@ def test_status_move_no_damage(pokemon_instances):
     status_move = Move(
         99,
         "Test Status",
-        MoveCategoryValue.Status,
+        MoveCategory.Status,
         PokemonTypeAccessor.Normal,
         0,
         100,

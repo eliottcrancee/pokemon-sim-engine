@@ -1,8 +1,7 @@
-import math
 import os
 import sys
 
-from joblib import Parallel, delayed
+from joblib import Parallel, cpu_count, delayed
 from tqdm import tqdm
 
 # Ensure current working directory is in path
@@ -33,10 +32,13 @@ def play_multiple(
     agent_0: BaseAgent,
     agent_1: BaseAgent,
     n_battles=1,
-    n_jobs=1,
+    n_jobs=-1,
     verbose=True,
 ) -> tuple[int, int, int]:
     """Play multiple battles in parallel using joblib."""
+
+    if n_jobs == -1:
+        n_jobs = cpu_count()
 
     def _run():
         return play(battle.copy(), agent_0, agent_1, verbose=False)
