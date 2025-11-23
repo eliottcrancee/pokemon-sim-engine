@@ -210,7 +210,7 @@ class Battle:
 
     def get_possible_actions(self, trainer_id: int) -> list[Action]:
         trainer = self.get_trainer_by_id(trainer_id)
-        opponent = self.get_trainer_by_id(trainer_id)
+        opponent = self.get_trainer_by_id(1 - trainer_id)
 
         actions = []
 
