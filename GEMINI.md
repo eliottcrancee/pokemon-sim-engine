@@ -1,0 +1,1 @@
+This project is a Pokemon battle simulator that allows users to pit different AI agents against each other in strategic battles. The simulator supports various AI strategies, including Minimax and Alpha-Beta pruning algorithms, enabling users to evaluate and compare their performance in a controlled environment.

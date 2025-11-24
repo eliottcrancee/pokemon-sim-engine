@@ -1,5 +1,6 @@
 # src/pokemon/agents/heuristic.py
 """This module defines agents that use heuristics to make decisions."""
+
 from __future__ import annotations
 
 import random
@@ -36,13 +37,16 @@ def _get_best_heal_action(actions: list[Action]) -> Optional[Action]:
 class RandomAttackAndPotionAgent(BaseAgent):
     """Agent that randomly attacks, but uses a potion if HP is low."""
 
-    def __init__(self, name: str = "RandomAttackAndPotion", heal_threshold: float = 0.2):
+    def __init__(
+        self, name: str = "RandomAttackAndPotion", heal_threshold: float = 0.2
+    ):
         """Initialize the agent.
         Args:
             name: The name of the agent.
             heal_threshold: The HP percentage below which the agent will try to
                 use a healing item.
         """
+        name = f"{name}(heal_threshold={heal_threshold})"
         super().__init__(name)
         self.heal_threshold = heal_threshold
 
@@ -120,15 +124,14 @@ class BestAttackAgent(BaseAgent):
 class BestAttackAndPotionAgent(BaseAgent):
     """Agent that uses the best attack, but uses a potion if HP is low."""
 
-    def __init__(
-        self, name: str = "BestAttackAndPotion", heal_threshold: float = 0.2
-    ):
+    def __init__(self, name: str = "BestAttackAndPotion", heal_threshold: float = 0.2):
         """Initialize the agent.
         Args:
             name: The name of the agent.
             heal_threshold: The HP percentage below which the agent will try
                 to use a healing item.
         """
+        name = f"{name}(heal_threshold={heal_threshold})"
         super().__init__(name)
         self.heal_threshold = heal_threshold
 
