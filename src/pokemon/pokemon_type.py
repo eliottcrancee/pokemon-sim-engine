@@ -1,205 +1,298 @@
-# pokemon_type.py
-
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
-from pympler import asizeof
-
-from pokemon.config import DEBUG
+from enum import IntEnum, unique
+from typing import Final, NamedTuple
 
 
-class PokemonTypeError(Exception):
-    """Custom exception for validation errors."""
+class TypeConfig(NamedTuple):
+    label: str
+    weaknesses: set[str] = set()
+    resistances: set[str] = set()
+    immunities: set[str] = set()
 
-    def __init__(self, message: str) -> None:
-        super().__init__(message)
-        self.message = message
 
+@unique
+class PokemonType(IntEnum):
+    """
+    IntEnum allows these members to be used directly as array indices.
+    Value starts at 0 for direct mapping to the cache matrix.
+    """
 
-@dataclass()
-class PokemonType:
-    type_id: int
-    name: str
-    weaknesses: frozenset[str] = field(default_factory=frozenset)
-    resistances: frozenset[str] = field(default_factory=frozenset)
-    immunities: frozenset[str] = field(default_factory=frozenset)
-    _relations_resolved: bool = field(default=False, init=False, repr=False)
+    NONETYPE = 0
+    NORMAL = 1
+    FIRE = 2
+    WATER = 3
+    GRASS = 4
+    ELECTRIC = 5
+    ICE = 6
+    FIGHTING = 7
+    POISON = 8
+    GROUND = 9
+    FLYING = 10
+    PSYCHIC = 11
+    BUG = 12
+    ROCK = 13
+    GHOST = 14
+    DRAGON = 15
+    DARK = 16
+    STEEL = 17
+    FAIRY = 18
 
-    def __post_init__(self) -> None:
-        if DEBUG:
-            self.validate_inputs()
+    def effectiveness_against(
+        self, defenders: tuple[PokemonType, PokemonType]
+    ) -> float:
+        """
+        O(N) lookup using the precomputed global matrix.
+        Since N is max 2, this is effectively O(1).
+        """
+        return _EFFECTIVENESS_CHART_3D[self][defenders[0]][defenders[1]]
 
-    def validate_inputs(self) -> None:
-        if not isinstance(self.name, str):
-            raise PokemonTypeError(
-                f"Name must be a string, not {type(self.name).__name__}"
-            )
-        if not isinstance(self.type_id, int):
-            raise PokemonTypeError(
-                f"PokemonType ID must be an integer, not {type(self.type_id).__name__}"
-            )
-        for attr in ["weaknesses", "resistances", "immunities"]:
-            if not isinstance(getattr(self, attr), frozenset):
-                raise PokemonTypeError(
-                    f"{attr.capitalize()} must be a frozenset, not {type(getattr(self, attr)).__name__}"
-                )
-
-    def effectiveness_against(self, target_types: list["PokemonType"]) -> float:
-        effectiveness = 1.0
-        for target_type in target_types:
-            if self in target_type.immunities:
-                return 0.0
-            elif self in target_type.weaknesses:
-                effectiveness *= 2.0
-            elif self in target_type.resistances:
-                effectiveness *= 0.5
-        return effectiveness
+    @property
+    def label(self) -> str:
+        return _TYPE_CONFIGS[self].label
 
     def __repr__(self) -> str:
-        return f"PokemonType(id={self.type_id}, name={self.name})"
+        return f"<PokemonType.{self.name}>"
 
     def __str__(self) -> str:
-        return self.name.capitalize()
-
-    def __eq__(self, other: "PokemonType") -> bool:
-        return self.type_id == other.type_id
-
-    def __hash__(self) -> int:
-        return hash((self.type_id, self.name))
-
-    @property
-    def memory_size(self) -> int:
-        return asizeof.asizeof(self)
+        return self.label.capitalize()
 
 
-# fmt: off
-TypeNone = PokemonType(0, "TypeNone")
-Normal  = PokemonType(1, "Normal",
-    weaknesses=frozenset({"Fighting"}),
-    resistances=frozenset(),
-    immunities=frozenset({"Ghost"}))
-Fire    = PokemonType(2, "Fire",
-    weaknesses=frozenset({"Water","Ground","Rock"}),
-    resistances=frozenset({"Grass","Fire","Steel","Ice"}),
-    immunities=frozenset())
-Water   = PokemonType(3, "Water",
-    weaknesses=frozenset({"Grass","Electric"}),
-    resistances=frozenset({"Fire","Water","Ice","Steel"}),
-    immunities=frozenset())
-Grass   = PokemonType(4, "Grass",
-    weaknesses=frozenset({"Fire","Ice","Poison","Flying","Bug"}),
-    resistances=frozenset({"Water","Grass","Electric","Ground"}),
-    immunities=frozenset())
-Electric= PokemonType(5, "Electric",
-    weaknesses=frozenset({"Ground"}),
-    resistances=frozenset({"Electric","Flying","Steel"}),
-    immunities=frozenset())
-Ice     = PokemonType(6, "Ice",
-    weaknesses=frozenset({"Fire","Fighting","Rock","Steel"}),
-    resistances=frozenset({"Ice"}),
-    immunities=frozenset())
-Fighting= PokemonType(7, "Fighting",
-    weaknesses=frozenset({"Flying","Psychic"}),
-    resistances=frozenset({"Bug","Rock","Dark"}),
-    immunities=frozenset())
-Poison  = PokemonType(8, "Poison",
-    weaknesses=frozenset({"Ground","Psychic"}),
-    resistances=frozenset({"Grass","Fighting","Poison","Bug"}),
-    immunities=frozenset())
-Ground  = PokemonType(9, "Ground",
-    weaknesses=frozenset({"Water","Grass","Ice"}),
-    resistances=frozenset({"Poison","Rock"}),
-    immunities=frozenset({"Electric"}))
-Flying  = PokemonType(10,"Flying",
-    weaknesses=frozenset({"Electric","Ice","Rock"}),
-    resistances=frozenset({"Grass","Fighting","Bug"}),
-    immunities=frozenset({"Ground"}))
-Psychic = PokemonType(11,"Psychic",
-    weaknesses=frozenset({"Bug","Ghost","Dark"}),
-    resistances=frozenset({"Fighting","Psychic"}),
-    immunities=frozenset())
-Bug     = PokemonType(12,"Bug",
-    weaknesses=frozenset({"Fire","Flying","Rock"}),
-    resistances=frozenset({"Grass","Fighting","Ground"}),
-    immunities=frozenset({"Psychic"}))
-Rock    = PokemonType(13,"Rock",
-    weaknesses=frozenset({"Water","Grass","Fighting","Ground","Steel"}),
-    resistances=frozenset({"Normal","Fire","Poison","Flying"}),
-    immunities=frozenset())
-Ghost   = PokemonType(14,"Ghost",
-    weaknesses=frozenset({"Ghost","Dark"}),
-    resistances=frozenset({"Bug","Poison"}),
-    immunities=frozenset({"Normal","Fighting"}))
-Dragon  = PokemonType(15,"Dragon",
-    weaknesses=frozenset({"Ice","Dragon"}),
-    resistances=frozenset({"Fire","Water","Electric","Grass"}),
-    immunities=frozenset())
-Dark    = PokemonType(16,"Dark",
-    weaknesses=frozenset({"Fighting","Bug"}),
-    resistances=frozenset({"Ghost","Dark"}),
-    immunities=frozenset())
-Steel   = PokemonType(17,"Steel",
-    weaknesses=frozenset({"Fire","Fighting","Ground"}),
-    resistances=frozenset({"Normal","Grass","Ice","Flying","Psychic","Bug","Rock","Ghost","Dragon","Dark","Steel"}),
-    immunities=frozenset({"Poison"}))
-# fmt: on
+# 3. Configuration Data (Declarative, easy to read/edit)
+# Using string names here avoids circular reference issues during definition.
+_RAW_CONFIG: dict[PokemonType, TypeConfig] = {
+    PokemonType.NONETYPE: TypeConfig("Nonetype"),
+    PokemonType.NORMAL: TypeConfig(
+        "Normal", weaknesses={"Fighting"}, immunities={"Ghost"}
+    ),
+    PokemonType.FIRE: TypeConfig(
+        "Fire",
+        weaknesses={"Water", "Ground", "Rock"},
+        resistances={"Grass", "Fire", "Steel", "Ice", "Bug", "Fairy"},
+    ),
+    PokemonType.WATER: TypeConfig(
+        "Water",
+        weaknesses={"Grass", "Electric"},
+        resistances={"Fire", "Water", "Ice", "Steel"},
+    ),
+    PokemonType.GRASS: TypeConfig(
+        "Grass",
+        weaknesses={"Fire", "Ice", "Poison", "Flying", "Bug"},
+        resistances={"Water", "Grass", "Electric", "Ground"},
+    ),
+    PokemonType.ELECTRIC: TypeConfig(
+        "Electric",
+        weaknesses={"Ground"},
+        resistances={"Electric", "Flying", "Steel"},
+    ),
+    PokemonType.ICE: TypeConfig(
+        "Ice",
+        weaknesses={"Fire", "Fighting", "Rock", "Steel"},
+        resistances={"Ice"},
+    ),
+    PokemonType.FIGHTING: TypeConfig(
+        "Fighting",
+        weaknesses={"Flying", "Psychic", "Fairy"},
+        resistances={"Bug", "Rock", "Dark"},
+    ),
+    PokemonType.POISON: TypeConfig(
+        "Poison",
+        weaknesses={"Ground", "Psychic"},
+        resistances={"Grass", "Fighting", "Poison", "Bug", "Fairy"},
+    ),
+    PokemonType.GROUND: TypeConfig(
+        "Ground",
+        weaknesses={"Water", "Grass", "Ice"},
+        resistances={"Poison", "Rock"},
+        immunities={"Electric"},
+    ),
+    PokemonType.FLYING: TypeConfig(
+        "Flying",
+        weaknesses={"Electric", "Ice", "Rock"},
+        resistances={"Grass", "Fighting", "Bug"},
+        immunities={"Ground"},
+    ),
+    PokemonType.PSYCHIC: TypeConfig(
+        "Psychic",
+        weaknesses={"Bug", "Ghost", "Dark"},
+        resistances={"Fighting", "Psychic"},
+    ),
+    PokemonType.BUG: TypeConfig(
+        "Bug",
+        weaknesses={"Fire", "Flying", "Rock"},
+        resistances={"Grass", "Fighting", "Ground"},
+        immunities={"Psychic"},
+    ),
+    PokemonType.ROCK: TypeConfig(
+        "Rock",
+        weaknesses={"Water", "Grass", "Fighting", "Ground", "Steel"},
+        resistances={"Normal", "Fire", "Poison", "Flying"},
+    ),
+    PokemonType.GHOST: TypeConfig(
+        "Ghost",
+        weaknesses={"Ghost", "Dark"},
+        resistances={"Bug", "Poison"},
+        immunities={"Normal", "Fighting"},
+    ),
+    PokemonType.DRAGON: TypeConfig(
+        "Dragon",
+        weaknesses={"Ice", "Dragon", "Fairy"},
+        resistances={"Fire", "Water", "Electric", "Grass"},
+    ),
+    PokemonType.DARK: TypeConfig(
+        "Dark",
+        weaknesses={"Fighting", "Bug", "Fairy"},
+        resistances={"Ghost", "Dark"},
+    ),
+    PokemonType.STEEL: TypeConfig(
+        "Steel",
+        weaknesses={"Fire", "Fighting", "Ground"},
+        resistances={
+            "Normal",
+            "Grass",
+            "Ice",
+            "Flying",
+            "Psychic",
+            "Bug",
+            "Rock",
+            "Ghost",
+            "Dragon",
+            "Dark",
+            "Steel",
+            "Fairy",
+        },
+        immunities={"Poison"},
+    ),
+    PokemonType.FAIRY: TypeConfig(
+        "Fairy",
+        weaknesses={"Poison", "Steel"},
+        resistances={"Fighting", "Bug", "Dark"},
+        immunities={"Dragon"},
+    ),
+}
 
-_TYPE_LIST: list[PokemonType] = sorted(
-    (obj for obj in globals().values() if isinstance(obj, PokemonType)),
-    key=lambda t: t.type_id,
+
+# 4. The "Magic" - Precomputing the Global Matrix
+def _build_effectiveness_chart() -> tuple[tuple[float, ...], ...]:
+    """
+    Builds a 2D immutable matrix of float multipliers.
+    Dimensions: Attacker x Defender.
+    """
+    size = len(PokemonType)
+    matrix = [[1.0] * size for _ in range(size)]
+
+    for attacker in PokemonType:
+        atk_cfg = _RAW_CONFIG[attacker]
+
+        for defender in PokemonType:
+            def_cfg = _RAW_CONFIG[defender]
+            atk_name = atk_cfg.label
+
+            if atk_name in def_cfg.immunities:
+                matrix[attacker][defender] = 0.0
+            elif atk_name in def_cfg.weaknesses:
+                matrix[attacker][defender] = 2.0
+            elif atk_name in def_cfg.resistances:
+                matrix[attacker][defender] = 0.5
+
+    # Convert to tuple of tuples for immutability and slight speed boost
+    return tuple(tuple(row) for row in matrix)
+
+
+# Execute precomputation on module import
+_TYPE_CONFIGS: Final = _RAW_CONFIG
+_EFFECTIVENESS_CHART: Final[tuple[tuple[float, ...], ...]] = (
+    _build_effectiveness_chart()
 )
 
-assert len({t.type_id for t in _TYPE_LIST}) == len(_TYPE_LIST), (
-    "Duplicate PokemonType IDs"
+
+def _build_effectiveness_chart_3d() -> tuple[tuple[float, ...], ...]:
+    """
+    Builds a 3D immutable matrix of float multipliers.
+    Dimensions: Attacker x Defender1 x Defender2.
+    """
+    size = len(PokemonType)
+    matrix = [[[1.0] * size for _ in range(size)] for _ in range(size)]
+    for attacker in PokemonType:
+        for defender1 in PokemonType:
+            for defender2 in PokemonType:
+                multiplier = (
+                    _EFFECTIVENESS_CHART[attacker][defender1]
+                    * _EFFECTIVENESS_CHART[attacker][defender2]
+                )
+                matrix[attacker][defender1][defender2] = multiplier
+    return tuple(tuple(tuple(row) for row in plane) for plane in matrix)
+
+
+# Execute precomputation on module import
+_EFFECTIVENESS_CHART_3D: Final[tuple[tuple[float, ...], ...]] = (
+    _build_effectiveness_chart_3d()
 )
-assert all(t.type_id == i for i, t in enumerate(_TYPE_LIST)), "Invalid PokemonType IDs"
-
-_TYPE_BY_NAME: dict[str, PokemonType] = {t.name: t for t in _TYPE_LIST}
-_TYPE_BY_ID: dict[int, PokemonType] = {t.type_id: t for t in _TYPE_LIST}
 
 
-class _PokemonTypeAccessor:
-    def __getattr__(self, attr: str) -> PokemonType:
-        t = _TYPE_BY_NAME.get(attr) or _TYPE_BY_NAME.get(attr.capitalize())
-        if t:
-            return t
-        raise AttributeError(f"No PokemonType named '{attr}'")
+if __name__ == "__main__":
+    import matplotlib.colors as colors
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import seaborn as sns
 
-    def __iter__(self):
-        return iter(_TYPE_LIST)
+    # 1. Prepare Data
+    # Convert the tuple-of-tuples to a numpy array for plotting
+    data = np.array(_EFFECTIVENESS_CHART)
 
-    def __len__(self):
-        return len(_TYPE_LIST)
+    # Get labels from the Enum
+    labels = [t.label for t in PokemonType]
 
-    def __repr__(self):
-        return "PokemonTypes(" + ", ".join(t.name for t in _TYPE_LIST) + ")"
+    # 2. Define a Custom Discrete Colormap
+    # 0.0 = Grey (Immune)
+    # 0.5 = Red (Not Very Effective)
+    # 1.0 = White (Neutral)
+    # 2.0 = Green (Super Effective)
+    custom_colors = ["#e0e0e0", "#ffadad", "#ffffff", "#9bf6ff", "#caffbf"]
+    # Note: I added a slot for 1.0-2.0 just in case, but we map specific boundaries below.
 
-    def by_id(self, type_id: int) -> PokemonType:
-        return _TYPE_BY_ID[type_id]
+    # We map specific values to colors:
+    # 0.0 -> Grey, 0.5 -> Red, 1.0 -> White, 2.0 -> Green
+    cmap = colors.ListedColormap(["#7f8c8d", "#e74c3c", "#ecf0f1", "#2ecc71"])
+    bounds = [0, 0.1, 0.9, 1.1, 2.1]
+    norm = colors.BoundaryNorm(bounds, cmap.N)
 
-    def get(self, name: str) -> PokemonType | None:
-        return _TYPE_BY_NAME.get(name)
+    # 3. Setup Plot
+    plt.figure(figsize=(14, 12))
 
-    @property
-    def names(self) -> list[str]:
-        return list(_TYPE_BY_NAME.keys())
+    ax = sns.heatmap(
+        data,
+        xticklabels=labels,
+        yticklabels=labels,
+        cmap=cmap,
+        norm=norm,
+        annot=True,  # Show numbers in cells
+        fmt=".1g",  # Format as 0, 0.5, 1, 2 (no trailing zeros)
+        cbar=False,  # Hide color bar (we use a legend instead)
+        linewidths=0.5,
+        linecolor="lightgrey",
+        square=True,  # Force cells to be square
+    )
 
+    # 4. Aesthetics
+    ax.set_title("Pokémon Type Effectiveness Chart", fontsize=18, pad=20)
+    ax.set_xlabel("Defender", fontsize=14, labelpad=10)
+    ax.set_ylabel("Attacker", fontsize=14, labelpad=10)
 
-PokemonTypeAccessor = _PokemonTypeAccessor()
+    # Move X-axis labels to top for easier reading
+    ax.xaxis.tick_top()
+    ax.xaxis.set_label_position("top")
+    plt.xticks(rotation=45, ha="left")
+    plt.yticks(rotation=0)
 
+    # 5. Custom Legend (Since we hid the colorbar)
+    legend_elements = [
+        plt.Rectangle((0, 0), 1, 1, color="#7f8c8d", label="0x (Immune)"),
+        plt.Rectangle((0, 0), 1, 1, color="#e74c3c", label="0.5x (Resist)"),
+        plt.Rectangle((0, 0), 1, 1, color="#ecf0f1", label="1x (Neutral)"),
+        plt.Rectangle((0, 0), 1, 1, color="#2ecc71", label="2x (Weakness)"),
+    ]
+    plt.legend(handles=legend_elements, loc="upper right", bbox_to_anchor=(1.2, 1))
 
-def resolve_relations():
-    name_map = {t.name: t for t in PokemonTypeAccessor}
-    for t in PokemonTypeAccessor:
-        for attr in ["weaknesses", "resistances", "immunities"]:
-            lst = getattr(t, attr)
-            if lst:
-                setattr(t, attr, [name_map[n] for n in lst])
-    for t in PokemonTypeAccessor:
-        for attr in ["weaknesses", "resistances", "immunities"]:
-            if not all(isinstance(i, PokemonType) for i in getattr(t, attr)):
-                raise ValueError(f"Invalid {attr} for {t.name}")
-
-
-resolve_relations()
+    plt.tight_layout()
+    plt.show()
