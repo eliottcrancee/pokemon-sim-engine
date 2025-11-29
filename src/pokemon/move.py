@@ -1,361 +1,702 @@
-# move.py
+from __future__ import annotations
 
 import random
-from dataclasses import dataclass
-from functools import cached_property
+from abc import ABC
+from enum import IntEnum, unique
+from typing import TYPE_CHECKING, Final
 
-import torch
-from pympler import asizeof
-
-from pokemon.config import DEBUG
 from pokemon.message import Message
-from pokemon.pokemon_type import PokemonType, PokemonTypeAccessor
-from pokemon.tensor_cache import ONEHOTCACHE
+from pokemon.pokemon_status import PokemonStatus
+from pokemon.pokemon_type import PokemonType
 
-ACCURACY_MODIFIERS = [0.33, 0.38, 0.43, 0.5, 0.6, 0.75, 1, 1.33, 1.67, 2, 2.33, 2.67, 3]
+if TYPE_CHECKING:
+    from pokemon.pokemon import Pokemon
+
+
+_STAT_NAME_TO_INDEX: Final[dict[str, int]] = {
+    "attack": 0,
+    "defense": 1,
+    "sp_attack": 2,
+    "sp_defense": 3,
+    "speed": 4,
+}
+
+
+_ACCURACY_MODIFIERS: Final[tuple[float, ...]] = (
+    0.33,
+    0.38,
+    0.43,
+    0.5,
+    0.6,
+    0.75,
+    1.0,
+    1.33,
+    1.67,
+    2.0,
+    2.33,
+    2.67,
+    3.0,
+)
+
+
+@unique
+class MoveCategory(IntEnum):
+    """Enumeration for move categories (Physical, Special, Status)."""
+
+    PHYSICAL = 0
+    SPECIAL = 1
+    STATUS = 2
 
 
 class MoveError(Exception):
-    """Custom exception for validation errors."""
+    """Custom exception for move-related errors."""
 
-    def __init__(self, message):
-        super().__init__(message)
-        self.message = message
+    pass
 
 
-class MoveCategoryValue:
-    """Class representing a value in the MoveCategory enum."""
+def _calculate_base_damage(
+    power: int,
+    atk: int,
+    defi: int,
+    level_factor: float,
+    effectiveness: float,
+    stab: bool,
+    accuracy: int,
+    acc_stage: int,
+) -> tuple[int, int, bool, bool, float]:
+    """
+    A pure and optimized function for damage calculation.
+    Detached from the class to be testable in isolation.
+    """
 
-    def __init__(self, value: int, name: str):
-        self.value = value
+    # Map the accuracy stage index (-6 to +6) to the array index (0 to 12)
+    acc_idx = max(0, min(12, acc_stage + 6))
+    hit_threshold = (accuracy * _ACCURACY_MODIFIERS[acc_idx]) / 100.0
+
+    if random.random() >= hit_threshold:
+        return 0, 0, False, stab, effectiveness
+
+    # Standard Pokémon damage formula (approximated)
+    raw_dmg = (level_factor * power * (atk / defi)) / 50 + 2
+
+    # Random factor [0.85, 1.0]
+    multiplier = effectiveness * (0.85 + 0.15 * random.random())
+
+    is_critical = random.random() < 0.0625
+    if is_critical:
+        multiplier *= 1.5
+
+    if stab:
+        multiplier *= 1.5
+
+    final_damage = int(raw_dmg * multiplier)
+
+    # Base damage (raw info before RNG) useful for UI or AI
+    base_info = int(raw_dmg * effectiveness * (1.5 if stab else 1.0))
+
+    return final_damage, base_info, is_critical, stab, effectiveness
+
+
+class Move(ABC):
+    """
+    Base class for all moves, optimized for memory using __slots__.
+    """
+
+    __slots__ = (
+        "id",
+        "name",
+        "category",
+        "type",
+        "power",
+        "accuracy",
+        "pp",
+        "max_pp",
+        "priority",
+    )
+
+    def __init__(
+        self,
+        name: str,
+        category: MoveCategory,
+        p_type: PokemonType,
+        power: int,
+        accuracy: int,
+        pp: int,
+        priority: int = 0,
+    ):
+        self.id: int = -1  # Will be assigned by the registry
         self.name = name
+        self.category = category
+        self.type = p_type
+        self.power = power
+        self.accuracy = accuracy
+        self.pp = pp
+        self.max_pp = pp  # To restore PP
+        self.priority = priority
 
-    def __str__(self):
-        return self.name
-
-    def __eq__(self, other):
-        return self.value == other.value
-
-
-class MoveCategory:
-    """Enum representing the category of a Pokémon move."""
-
-    Physical = MoveCategoryValue(0, "Physical")
-    Special = MoveCategoryValue(1, "Special")
-    Status = MoveCategoryValue(2, "Status")
-
-
-@dataclass
-class Move:
-    move_id: int
-    name: str
-    category: MoveCategoryValue
-    type: PokemonType
-    power: int
-    accuracy: int
-    pp: int
-
-    def __post_init__(self):
-        if DEBUG:
-            self.validate_inputs()
-
-    def validate_inputs(self):
-        if not isinstance(self.name, str):
-            raise MoveError(f"Name must be a string, not {type(self.name).__name__}")
-        if not isinstance(self.move_id, int):
-            raise MoveError(
-                f"Move ID must be an integer, not {type(self.move_id).__name__}"
-            )
-        if not isinstance(self.category, MoveCategoryValue):
-            raise MoveError(
-                f"Category must be a MoveCategory, not {type(self.category).__name__}"
-            )
-        if not isinstance(self.type, PokemonType):
-            raise MoveError(
-                f"Type must be a PokemonType, not {type(self.type).__name__}"
-            )
-        if not isinstance(self.power, int) or self.power < 0:
-            raise MoveError(f"Power must be a non-negative integer, not {self.power}")
-        if not isinstance(self.accuracy, int) or not 0 <= self.accuracy <= 100:
-            raise MoveError(
-                f"Accuracy must be an integer between 0 and 100, not {self.accuracy}"
-            )
-        if not isinstance(self.pp, int) or self.pp < 0:
-            raise MoveError(f"PP must be a non-negative integer, not {self.pp}")
-
-    def calculate_damage(self, user, target) -> tuple[int, int, bool, bool, float]:
-        if self.power == 0 or self.category == MoveCategory.Status:
+    def calculate_damage(
+        self, user: Pokemon, target: Pokemon
+    ) -> tuple[int, int, bool, bool, float]:
+        """
+        Orchestrates stat retrieval and calls the pure calculation logic.
+        """
+        if self.category == MoveCategory.STATUS or self.power == 0:
             return 0, 0, False, False, 1.0
 
-        attack_stat = (
-            user.attack if self.category == MoveCategory.Physical else user.sp_attack
-        )
-        defense_stat = (
-            target.defense
-            if self.category == MoveCategory.Physical
-            else target.sp_defense
-        )
+        # Dynamic stat determination (Physical vs Special)
+        if self.category == MoveCategory.PHYSICAL:
+            atk, defi = user.attack, target.defense
+        else:
+            atk, defi = user.sp_attack, target.sp_defense
 
-        base_damage = (
-            user.level_factor * self.power * (attack_stat / defense_stat)
-        ) / 50 + 2
+        # Type effectiveness using the precomputed chart
         effectiveness = self.type.effectiveness_against(target.types)
 
-        damage = base_damage * effectiveness * (0.85 + 0.15 * random.random())
-
-        critical = random.getrandbits(4) == 0
-        if critical:
-            damage *= 1.5
-
         stab = self.type in user.types
-        if stab:
-            damage *= 1.5
+        acc_stage = user._accuracy_stage
 
-        accuracy = int(
-            self.accuracy * ACCURACY_MODIFIERS[user._modifiers["accuracy"] + 6]
-        )
-        hit = random.randrange(100) < accuracy
-
-        return (
-            int(damage) if hit else 0,
-            int(base_damage),
-            critical,
-            stab,
+        return _calculate_base_damage(
+            self.power,
+            atk,
+            defi,
+            user.level_factor,
             effectiveness,
+            stab,
+            self.accuracy,
+            acc_stage,
         )
 
     def secondary_effect(
-        self, user, target, damage, base_damage, critical, stab, effectiveness
+        self,
+        user: Pokemon,
+        target: Pokemon,
+        damage_dealt: int,
+        base_damage: int,
+        critical: bool,
+        stab: bool,
+        effectiveness: float,
     ) -> list[Message]:
+        """Hook for secondary effects. By default, no effect."""
         return []
 
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}: {self.name} ({self.type.name})>"
+
     def __str__(self) -> str:
-        return f"{self.name} | Type: {self.type.name} | PP: {self.pp}/{self.pp}"
-
-    def __repr__(self):
-        return f"Move(id={self.move_id}, name={self.name}, category={self.category}, type={self.type}, power={self.power}, accuracy={self.accuracy}, pp={self.pp})"
-
-    def __eq__(self, other: "Move") -> bool:
-        return self.move_id == other.move_id
-
-    @property
-    def memory_size(self) -> int:
-        return asizeof.asizeof(self)
-
-    @property
-    def one_hot(self) -> torch.Tensor:
-        return ONEHOTCACHE.get_one_hot(len(MOVE_LIST), self.move_id)
-
-    @cached_property
-    def one_hot_description(self) -> torch.Tensor:
-        return MOVE_ONE_HOT_DESCRIPTION
+        return (
+            f"{self.name} | Type: {self.type.label} | PP: {self.max_pp}/{self.max_pp}"
+        )
 
 
-class StatModifyingMove(Move):
-    def __init__(self, move_id, name, type, pp, stat, stages, self_target=False):
-        super().__init__(move_id, name, MoveCategory.Status, type, 0, 100, pp)
-        self.stat = stat
+# --- Specific Implementations ---
+
+
+class SimpleMove(Move):
+    """Standard move that only deals damage."""
+
+    __slots__ = ()
+
+    def __init__(
+        self,
+        name: str,
+        category: MoveCategory,
+        p_type: PokemonType,
+        power: int,
+        accuracy: int,
+        pp: int,
+        priority: int = 0,
+    ):
+        super().__init__(name, category, p_type, power, accuracy, pp, priority)
+
+
+class StatMove(Move):
+    """Move that modifies a Pokémon's stats (Buff/Debuff)."""
+
+    __slots__ = (
+        "stat_index",
+        "is_accuracy_modifier",
+        "stages",
+        "self_target",
+        "_stat_name",
+    )
+
+    def __init__(
+        self,
+        name: str,
+        p_type: PokemonType,
+        pp: int,
+        stat: str,
+        stages: int,
+        self_target: bool = False,
+        accuracy: int = 100,
+        priority: int = 0,
+    ):
+        super().__init__(name, MoveCategory.STATUS, p_type, 0, accuracy, pp, priority)
+        self._stat_name = stat
+
+        if stat.lower() == "accuracy":
+            self.is_accuracy_modifier = True
+            self.stat_index = -1
+        else:
+            self.is_accuracy_modifier = False
+            self.stat_index = _STAT_NAME_TO_INDEX.get(stat.lower())
+            if self.stat_index is None:
+                raise ValueError(f"Invalid stat name for StatMove: {stat}")
+
         self.stages = stages
         self.self_target = self_target
 
     def secondary_effect(
-        self, user, target, damage, base_damage, critical, stab, effectiveness
+        self,
+        user: Pokemon,
+        target: Pokemon,
+        damage_dealt: int,
+        base_damage: int,
+        critical: bool,
+        stab: bool,
+        effectiveness: float,
     ) -> list[Message]:
+        """Applies the stat modification."""
         affected = user if self.self_target else target
-        affected.apply_modifier(self.stat, self.stages)
-        direction = "rose" if self.stages > 0 else "fell"
-        if abs(self.stages) > 1:
-            direction = "sharply " + direction
-        return [Message(f"{affected.surname}'s {self.stat} {direction}!")]
+
+        msgs = []
+        success = False
+        if self.is_accuracy_modifier:
+            success = affected.apply_accuracy_modifier(self.stages)
+        else:
+            success = affected.apply_modifier(self.stat_index, self.stages)
+
+        stat_name_for_message = self._stat_name
+
+        if not success:
+            msgs.append(
+                Message(
+                    f"{affected.surname}'s {stat_name_for_message} won't go any {'higher' if self.stages > 0 else 'lower'}!"
+                )
+            )
+        else:
+            adv = "rose" if self.stages > 0 else "fell"
+            qualifier = "sharply " if abs(self.stages) > 1 else ""
+            msgs.append(
+                Message(
+                    f"{affected.surname}'s {stat_name_for_message} {qualifier}{adv}!"
+                )
+            )
+        return msgs
 
 
-class StruggleMove(Move):
+class ApplyStatusMove(Move):
+    """
+    Move that applies a status effect (volatile or non-volatile).
+    This can be a pure status move (power=0) or a damaging move with a
+    chance to apply a status.
+    """
+
+    __slots__ = (
+        "status_to_apply",
+        "volatile_status",
+        "effect_chance",
+        "duration",
+        "self_target",
+    )
+
+    def __init__(
+        self,
+        name: str,
+        category: MoveCategory,
+        p_type: PokemonType,
+        power: int,
+        accuracy: int,
+        pp: int,
+        priority: int = 0,
+        effect_chance: float = 1.0,
+        status_to_apply: PokemonStatus | None = None,
+        volatile_status: str | None = None,
+        duration: tuple[int, int] | None = None,
+        self_target: bool = False,
+    ):
+        super().__init__(name, category, p_type, power, accuracy, pp, priority)
+        self.status_to_apply = status_to_apply
+        self.volatile_status = volatile_status
+        self.effect_chance = effect_chance
+        self.duration = duration
+        self.self_target = self_target
+
+    def secondary_effect(
+        self,
+        user: Pokemon,
+        target: Pokemon,
+        damage_dealt: int,
+        base_damage: int,
+        critical: bool,
+        stab: bool,
+        effectiveness: float,
+    ) -> list[Message]:
+        # For damaging moves, only apply effect if damage was dealt.
+        if self.power > 0 and damage_dealt == 0:
+            return []
+
+        # For pure status moves, check accuracy hit in the damage calc phase
+        # Here we just check the effect chance.
+        if random.random() > self.effect_chance:
+            return []
+
+        affected = user if self.self_target else target
+        msgs = []
+
+        # Apply non-volatile status
+        if self.status_to_apply and affected.status == PokemonStatus.HEALTHY:
+            affected.status = self.status_to_apply
+            status_name = self.status_to_apply.name.lower()
+            msgs.append(
+                Message(f"{affected.surname} was afflicted with {status_name}!")
+            )
+            if self.status_to_apply == PokemonStatus.SLEEP and self.duration:
+                affected._sleep_turns = random.randint(*self.duration)
+
+        # Apply volatile status
+        if self.volatile_status == "confuse" and not affected.confused:
+            affected.confused = True
+            if self.duration:
+                affected._confused_turns = random.randint(*self.duration)
+            msgs.append(Message(f"{affected.surname} became confused!"))
+
+        elif self.volatile_status == "taunt" and not affected.taunted:
+            affected.taunted = True
+            # Taunt has a fixed duration in later gens, but can be random here
+            affected._taunted_turns = self.duration[0] if self.duration else 3
+            msgs.append(Message(f"{affected.surname} was taunted!"))
+
+        return msgs
+
+
+class RecoilMove(Move):
+    """A move that inflicts recoil damage on the user (e.g., Take Down)."""
+
+    __slots__ = ("recoil_ratio",)
+
+    def __init__(
+        self,
+        name: str,
+        category: MoveCategory,
+        p_type: PokemonType,
+        power: int,
+        accuracy: int,
+        pp: int,
+        recoil_ratio: float = 0.25,
+        priority: int = 0,
+    ):
+        super().__init__(name, category, p_type, power, accuracy, pp, priority)
+        self.recoil_ratio = recoil_ratio
+
+    def secondary_effect(
+        self,
+        user: Pokemon,
+        target: Pokemon,
+        damage_dealt: int,
+        base_damage: int,
+        critical: bool,
+        stab: bool,
+        effectiveness: float,
+    ) -> list[Message]:
+        """Applies recoil damage to the user."""
+        if damage_dealt > 0:
+            recoil = max(1, int(damage_dealt * self.recoil_ratio))
+            user.hp -= recoil
+            return [Message(f"{user.surname} is hit with recoil!")]
+        return []
+
+
+class StruggleMove(RecoilMove):
+    """Specific implementation for the move Struggle."""
+
+    __slots__ = ()
+
     def __init__(self):
         super().__init__(
-            1,
             "Struggle",
-            MoveCategory.Physical,
-            PokemonTypeAccessor.Normal,
+            MoveCategory.PHYSICAL,
+            PokemonType.NORMAL,
             50,
             100,
             1,
+            recoil_ratio=0.0,
         )
 
     def secondary_effect(
-        self, user, target, damage, base_damage, critical, stab, effectiveness
+        self,
+        user: Pokemon,
+        target: Pokemon,
+        damage_dealt: int,
+        base_damage: int,
+        critical: bool,
+        stab: bool,
+        effectiveness: float,
     ) -> list[Message]:
-        super().secondary_effect(
-            user, target, damage, base_damage, critical, stab, effectiveness
-        )
-        try:
-            user._pp[user.moves.index(self)] -= 1
-        except ValueError:
-            pass
-        if user.hp <= 0:
-            return []
-        lose_hp = min(user.hp, user.max_hp // 4)
-        user.hp -= lose_hp
-        return [Message(f"{user.surname} lost {lose_hp} HP.")]
+        """
+        Struggle has a unique mechanic: 25% of max HP in recoil,
+        regardless of damage dealt.
+        """
+        recoil = max(1, user.max_hp // 4)
+        user.hp -= recoil
+        return [Message(f"{user.surname} lost {recoil} HP due to recoil!")]
 
 
-########## Define moves ##########
+# --- Registry System ---
 
-# --- System Moves ---
-SelfHit = Move(
-    0, "Self Hit", MoveCategory.Physical, PokemonTypeAccessor.TypeNone, 40, 100, 1
-)
-Struggle = StruggleMove()
 
-# --- Physical Moves ---
-Tackle = Move(
-    2, "Tackle", MoveCategory.Physical, PokemonTypeAccessor.Normal, 35, 95, 35
-)
-Scratch = Move(
-    3, "Scratch", MoveCategory.Physical, PokemonTypeAccessor.Normal, 40, 100, 35
-)
-Pound = Move(4, "Pound", MoveCategory.Physical, PokemonTypeAccessor.Normal, 40, 100, 35)
-Peck = Move(5, "Peck", MoveCategory.Physical, PokemonTypeAccessor.Flying, 35, 100, 35)
-VineWhip = Move(
-    6, "Vine Whip", MoveCategory.Physical, PokemonTypeAccessor.Grass, 35, 100, 10
-)
-RazorLeaf = Move(
-    7, "Razor Leaf", MoveCategory.Physical, PokemonTypeAccessor.Grass, 55, 95, 25
-)
-QuickAttack = Move(
-    8,
-    "Quick Attack",
-    MoveCategory.Physical,
-    PokemonTypeAccessor.Normal,
-    40,
-    100,
-    30,
-)
-WingAttack = Move(
-    9,
-    "Wing Attack",
-    MoveCategory.Physical,
-    PokemonTypeAccessor.Flying,
-    35,
-    100,
-    35,
-)
-Earthquake = Move(
-    10,
-    "Earthquake",
-    MoveCategory.Physical,
-    PokemonTypeAccessor.Ground,
-    100,
-    100,
-    10,
-)
+class MoveRegistry:
+    """
+    Singleton that manages the registration of and access to Moves.
+    Guarantees unique and sequential IDs.
+    """
 
-# --- Special Moves ---
-ThunderShock = Move(
-    11,
-    "Thunder Shock",
-    MoveCategory.Special,
-    PokemonTypeAccessor.Electric,
-    40,
-    100,
-    30,
-)
-Ember = Move(12, "Ember", MoveCategory.Special, PokemonTypeAccessor.Fire, 40, 100, 25)
-WaterGun = Move(
-    13, "Water Gun", MoveCategory.Special, PokemonTypeAccessor.Water, 40, 100, 25
-)
-Flamethrower = Move(
-    14, "Flamethrower", MoveCategory.Special, PokemonTypeAccessor.Fire, 95, 100, 15
-)
-HydroPump = Move(
-    15, "Hydro Pump", MoveCategory.Special, PokemonTypeAccessor.Water, 120, 80, 5
-)
-Thunderbolt = Move(
-    16,
-    "Thunderbolt",
-    MoveCategory.Special,
-    PokemonTypeAccessor.Electric,
-    95,
-    100,
-    15,
-)
-Psychic = Move(
-    17, "Psychic", MoveCategory.Special, PokemonTypeAccessor.Psychic, 90, 100, 10
-)
+    _moves: list[Move] = []
+    _map: dict[str, Move] = {}
 
-# --- Status Moves ---
-Growl = StatModifyingMove(18, "Growl", PokemonTypeAccessor.Normal, 40, "attack", -1)
-TailWhip = StatModifyingMove(
-    19, "Tail Whip", PokemonTypeAccessor.Normal, 30, "defense", -1
-)
-SandAttack = StatModifyingMove(
-    20, "Sand Attack", PokemonTypeAccessor.Ground, 15, "accuracy", -1
-)
-Agility = StatModifyingMove(
-    21, "Agility", PokemonTypeAccessor.Psychic, 30, "speed", 2, self_target=True
-)
+    @classmethod
+    def register(cls, move: Move) -> Move:
+        """Assigns a unique ID to the move and registers it."""
+        move.id = len(cls._moves)
+        cls._moves.append(move)
+        # Normalized key for case/space insensitive search
+        key = move.name.replace(" ", "").lower()
+        if key in cls._map:
+            raise MoveError(f"Duplicate move name registered: {move.name}")
+        cls._map[key] = move
+        return move
 
-########## ################# ##########
+    @classmethod
+    def get(cls, name_or_id: str | int) -> Move | None:
+        """Retrieves a move by its name (str) or ID (int)."""
+        if isinstance(name_or_id, int):
+            return cls._moves[name_or_id] if 0 <= name_or_id < len(cls._moves) else None
+        return cls._map.get(str(name_or_id).replace(" ", "").lower())
 
-MOVE_LIST = [
-    SelfHit,
-    Struggle,
-    Tackle,
-    Scratch,
-    Pound,
-    Peck,
-    VineWhip,
-    RazorLeaf,
-    QuickAttack,
-    WingAttack,
-    Earthquake,
-    ThunderShock,
-    Ember,
-    WaterGun,
-    Flamethrower,
-    HydroPump,
-    Thunderbolt,
-    Psychic,
-    Growl,
-    TailWhip,
-    SandAttack,
-    Agility,
-]
-MOVE_MAP = {move.name.replace(" ", "").lower(): move for move in MOVE_LIST}
+    @classmethod
+    def all(cls) -> list[Move]:
+        """Returns a list of all registered moves."""
+        return cls._moves
 
-assert len({move.move_id for move in MOVE_LIST}) == len(MOVE_LIST), "Duplicate Move IDs"
-assert all(move.move_id == index for index, move in enumerate(MOVE_LIST)), (
-    "Invalid Move IDs"
+    @classmethod
+    def count(cls) -> int:
+        """Returns the total number of registered moves."""
+        return len(cls._moves)
+
+
+# --- Registration ---
+
+# System
+Struggle = MoveRegistry.register(StruggleMove())
+
+# Physical
+Tackle = MoveRegistry.register(
+    SimpleMove("Tackle", MoveCategory.PHYSICAL, PokemonType.NORMAL, 35, 95, 35)
+)
+Scratch = MoveRegistry.register(
+    SimpleMove("Scratch", MoveCategory.PHYSICAL, PokemonType.NORMAL, 40, 100, 35)
+)
+Pound = MoveRegistry.register(
+    SimpleMove("Pound", MoveCategory.PHYSICAL, PokemonType.NORMAL, 40, 100, 35)
+)
+Peck = MoveRegistry.register(
+    SimpleMove("Peck", MoveCategory.PHYSICAL, PokemonType.FLYING, 35, 100, 35)
+)
+VineWhip = MoveRegistry.register(
+    SimpleMove("Vine Whip", MoveCategory.PHYSICAL, PokemonType.GRASS, 35, 100, 10)
+)
+RazorLeaf = MoveRegistry.register(
+    SimpleMove("Razor Leaf", MoveCategory.PHYSICAL, PokemonType.GRASS, 55, 95, 25)
+)
+QuickAttack = MoveRegistry.register(
+    SimpleMove(
+        "Quick Attack",
+        MoveCategory.PHYSICAL,
+        PokemonType.NORMAL,
+        40,
+        100,
+        30,
+        priority=1,
+    )
+)
+WingAttack = MoveRegistry.register(
+    SimpleMove("Wing Attack", MoveCategory.PHYSICAL, PokemonType.FLYING, 35, 100, 35)
+)
+Earthquake = MoveRegistry.register(
+    SimpleMove("Earthquake", MoveCategory.PHYSICAL, PokemonType.GROUND, 100, 100, 10)
+)
+Slash = MoveRegistry.register(
+    SimpleMove("Slash", MoveCategory.PHYSICAL, PokemonType.NORMAL, 70, 100, 20)
+)
+Bite = MoveRegistry.register(
+    SimpleMove("Bite", MoveCategory.PHYSICAL, PokemonType.DARK, 60, 100, 25)
+)
+RockSlide = MoveRegistry.register(
+    SimpleMove("Rock Slide", MoveCategory.PHYSICAL, PokemonType.ROCK, 75, 90, 10)
+)
+IronTail = MoveRegistry.register(
+    SimpleMove("Iron Tail", MoveCategory.PHYSICAL, PokemonType.STEEL, 100, 75, 15)
+)
+BodySlam = MoveRegistry.register(
+    SimpleMove("Body Slam", MoveCategory.PHYSICAL, PokemonType.NORMAL, 85, 100, 15)
+)
+ExtremeSpeed = MoveRegistry.register(
+    SimpleMove(
+        "Extreme Speed",
+        MoveCategory.PHYSICAL,
+        PokemonType.NORMAL,
+        80,
+        100,
+        5,
+        priority=2,
+    )
+)
+SkullBash = MoveRegistry.register(
+    SimpleMove("Skull Bash", MoveCategory.PHYSICAL, PokemonType.NORMAL, 130, 100, 10)
+)
+SkyAttack = MoveRegistry.register(
+    SimpleMove("Sky Attack", MoveCategory.PHYSICAL, PokemonType.FLYING, 140, 90, 5)
 )
 
 
-class _MoveAccessor:
-    def __getattr__(self, attr: str) -> Move:
-        t = MOVE_MAP.get(attr.lower())
-        if t:
-            return t
-        raise AttributeError(f"No Move named '{attr}'")
+# Special
+ThunderShock = MoveRegistry.register(
+    SimpleMove("Thunder Shock", MoveCategory.SPECIAL, PokemonType.ELECTRIC, 40, 100, 30)
+)
+Ember = MoveRegistry.register(
+    ApplyStatusMove(
+        "Ember",
+        MoveCategory.SPECIAL,
+        PokemonType.FIRE,
+        power=40,
+        accuracy=100,
+        pp=25,
+        effect_chance=0.1,  # 10% chance
+        status_to_apply=PokemonStatus.BURN,
+    )
+)
+WaterGun = MoveRegistry.register(
+    SimpleMove("Water Gun", MoveCategory.SPECIAL, PokemonType.WATER, 40, 100, 25)
+)
+Flamethrower = MoveRegistry.register(
+    SimpleMove("Flamethrower", MoveCategory.SPECIAL, PokemonType.FIRE, 95, 100, 15)
+)
+HydroPump = MoveRegistry.register(
+    SimpleMove("Hydro Pump", MoveCategory.SPECIAL, PokemonType.WATER, 120, 80, 5)
+)
+Thunderbolt = MoveRegistry.register(
+    SimpleMove("Thunderbolt", MoveCategory.SPECIAL, PokemonType.ELECTRIC, 95, 100, 15)
+)
+Psychic = MoveRegistry.register(
+    SimpleMove("Psychic", MoveCategory.SPECIAL, PokemonType.PSYCHIC, 90, 100, 10)
+)
+SolarBeam = MoveRegistry.register(
+    SimpleMove("Solar Beam", MoveCategory.SPECIAL, PokemonType.GRASS, 120, 100, 10)
+)
+HyperBeam = MoveRegistry.register(
+    SimpleMove("Hyper Beam", MoveCategory.SPECIAL, PokemonType.NORMAL, 150, 90, 5)
+)
+Blizzard = MoveRegistry.register(
+    SimpleMove("Blizzard", MoveCategory.SPECIAL, PokemonType.ICE, 110, 70, 5)
+)
+DragonRage = MoveRegistry.register(
+    SimpleMove("Dragon Rage", MoveCategory.SPECIAL, PokemonType.DRAGON, 40, 100, 10)
+)
 
-    def __iter__(self):
-        return iter(MOVE_LIST)
-
-    def __len__(self):
-        return len(MOVE_LIST)
-
-    def __repr__(self):
-        return "Moves(" + ", ".join(t.name for t in MOVE_LIST) + ")"
-
-    def by_id(self, move_id: int) -> Move:
-        return MOVE_LIST[move_id]
-
-    def get(self, name: str) -> Move | None:
-        return MOVE_MAP.get(name)
-
-    @property
-    def names(self) -> list[str]:
-        return list(MOVE_MAP.keys())
+# Status
+Growl = MoveRegistry.register(StatMove("Growl", PokemonType.NORMAL, 40, "attack", -1))
+TailWhip = MoveRegistry.register(
+    StatMove("Tail Whip", PokemonType.NORMAL, 30, "defense", -1)
+)
+SandAttack = MoveRegistry.register(
+    StatMove("Sand Attack", PokemonType.GROUND, 15, "accuracy", -1, accuracy=100)
+)
+Agility = MoveRegistry.register(
+    StatMove("Agility", PokemonType.PSYCHIC, 30, "speed", 2, self_target=True)
+)
 
 
-MoveAccessor = _MoveAccessor()
+SleepPowder = MoveRegistry.register(
+    ApplyStatusMove(
+        "Sleep Powder",
+        MoveCategory.STATUS,
+        PokemonType.GRASS,
+        power=0,
+        accuracy=75,
+        pp=15,
+        status_to_apply=PokemonStatus.SLEEP,
+        duration=(1, 3),
+    )
+)
+
+ThunderWave = MoveRegistry.register(
+    ApplyStatusMove(
+        "Thunder Wave",
+        MoveCategory.STATUS,
+        PokemonType.ELECTRIC,
+        power=0,
+        accuracy=90,
+        pp=20,
+        status_to_apply=PokemonStatus.PARALYSIS,
+    )
+)
+
+WillOWisp = MoveRegistry.register(
+    ApplyStatusMove(
+        "Will-O-Wisp",
+        MoveCategory.STATUS,
+        PokemonType.FIRE,
+        power=0,
+        accuracy=85,
+        pp=15,
+        status_to_apply=PokemonStatus.BURN,
+    )
+)
+
+Supersonic = MoveRegistry.register(
+    ApplyStatusMove(
+        "Supersonic",
+        MoveCategory.STATUS,
+        PokemonType.NORMAL,
+        power=0,
+        accuracy=55,
+        pp=20,
+        volatile_status="confuse",
+        duration=(1, 4),
+    )
+)
+
+Taunt = MoveRegistry.register(
+    ApplyStatusMove(
+        "Taunt",
+        MoveCategory.STATUS,
+        PokemonType.DARK,
+        power=0,
+        accuracy=100,
+        pp=20,
+        volatile_status="taunt",
+        duration=(3, 3),
+    )
+)
 
 
-MOVE_ONE_HOT_DESCRIPTION = [move.name for move in MoveAccessor]
+# --- Accessor Helper ---
+
+
+class _MoveAccessorMeta(type):
+    """Metaclass to allow accessing moves like Moves.Tackle."""
+
+    def __getattr__(cls, name: str) -> Move:
+        move = MoveRegistry.get(name)
+        if move:
+            return move
+        raise AttributeError(f"Move '{name}' not found in MoveRegistry.")
+
+
+class Moves(metaclass=_MoveAccessorMeta):
+    """
+    Provides a clean, dot-notation accessor for all registered moves.
+    Usage: Moves.Tackle, Moves.Ember.
+    """
+
+    pass

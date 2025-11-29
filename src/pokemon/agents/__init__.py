@@ -1,22 +1,17 @@
-# src/pokemon/agents/__init__.py
-
-"""This package contains the different agents that can play the game."""
-
 from .base_agent import BaseAgent, EvaluatingAgent
 from .heuristic import (
     BestAttackAgent,
     BestAttackAndPotionAgent,
     RandomAttackAndPotionAgent,
+    SmarterHeuristicAgent,
 )
 from .search import (
     AlphaBetaAgent,
+    IterativeDeepeningAlphaBetaAgent,
+    MCTSAgent,
     MinimaxAgent,
-    OneStepAlphaBetaAgent,
-    OneStepMinimaxAgent,
+    MonteCarloExpectiminimaxAgent,
     OneStepUniformExpectimaxAgent,
-    ThreeStepAlphaBetaAgent,
-    TwoStepAlphaBetaAgent,
-    TwoStepMinimaxAgent,
 )
 from .simple import FirstAgent, InputAgent, RandomAgent, RandomAttackAgent
 
@@ -26,16 +21,15 @@ __all__ = [
     "BestAttackAgent",
     "BestAttackAndPotionAgent",
     "RandomAttackAndPotionAgent",
-    "OneStepMinimaxAgent",
-    "OneStepUniformExpectimaxAgent",
-    "TwoStepMinimaxAgent",
+    "SmarterHeuristicAgent",
+    "AlphaBetaAgent",
     "MinimaxAgent",
+    "MonteCarloExpectiminimaxAgent",
+    "OneStepUniformExpectimaxAgent",
     "FirstAgent",
     "InputAgent",
     "RandomAgent",
     "RandomAttackAgent",
-    "AlphaBetaAgent",
-    "OneStepAlphaBetaAgent",
-    "TwoStepAlphaBetaAgent",
-    "ThreeStepAlphaBetaAgent",
+    "IterativeDeepeningAlphaBetaAgent",
+    "MCTSAgent",
 ]

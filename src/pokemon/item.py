@@ -1,286 +1,199 @@
-# item.py
+from __future__ import annotations
 
-from dataclasses import dataclass, field
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from enum import IntEnum, unique
+from typing import TYPE_CHECKING
 
-import torch
-from pympler import asizeof
-
-from pokemon.config import DEBUG, MAX_ITEM_QUANTITY
 from pokemon.message import Message
-from pokemon.pokemon import Pokemon, PokemonStatus
-from pokemon.tensor_cache import ONEHOTCACHE
+from pokemon.pokemon import PokemonStatus
+
+if TYPE_CHECKING:
+    from pokemon.pokemon import Pokemon
+
+
+@unique
+class ItemCategory(IntEnum):
+    MEDICINE = 0
+    POKEBALL = 1
+    BATTLE = 2
+    KEY_ITEM = 3
+    BERRY = 4
 
 
 class ItemError(Exception):
-    """Custom exception for validation errors."""
-
-    def __init__(self, message):
-        super().__init__(message)
-        self.message = message
+    pass
 
 
-class ItemCategoryValue:
-    """Class representing a category of items."""
+class ItemEffect(ABC):
+    """Abstract base class for item effects."""
 
-    def __init__(self, value: int, name: str):
-        self.value = value
-        self.name = name
+    @abstractmethod
+    def apply(self, target: Pokemon) -> list[Message]:
+        pass
 
-    def __str__(self) -> str:
-        return self.name
-
-    def __eq__(self, other):
-        return self.value == other.value
+    @abstractmethod
+    def can_use(self, target: Pokemon) -> bool:
+        pass
 
 
-class ItemCategory:
-    """Enum for Item categories."""
+@dataclass(frozen=True, slots=True)
+class HealHP(ItemEffect):
+    amount: int
 
-    Healing = ItemCategoryValue(0, "Healing")
-    PokeBall = ItemCategoryValue(1, "PokeBall")
-    Battle = ItemCategoryValue(2, "Battle")
-    KeyItem = ItemCategoryValue(3, "KeyItem")
+    def can_use(self, target: Pokemon) -> bool:
+        return target.is_alive and target.hp < target.max_hp
+
+    def apply(self, target: Pokemon) -> list[Message]:
+        old_hp = target.hp
+        target.hp += self.amount
+        recovered = target.hp - old_hp
+        return [Message(f"{target.surname} recovered {recovered} HP.")]
 
 
-@dataclass
-class Item:
-    item_id: int
-    name: str
-    category: ItemCategoryValue
-    description: str
-    default_quantity: int = field(default=0)
+@dataclass(frozen=True, slots=True)
+class HealStatus(ItemEffect):
+    status_list: list[tuple[PokemonStatus, ...]] | None = None  # None = All
 
-    def __post_init__(self):
-        if DEBUG:
-            self.validate_inputs()
-        self.quantity = self.default_quantity
-
-    def copy(self):
-        cls = self.__class__
-        new_item = cls.__new__(cls)
-        for k, v in self.__dict__.items():
-            setattr(new_item, k, v)
-        return new_item
-
-    def validate_inputs(self):
-        if not isinstance(self.name, str):
-            raise ItemError(f"Name must be a string, not {type(self.name).__name__}")
-        if not isinstance(self.category, ItemCategoryValue):
-            raise ItemError(
-                f"Category must be an ItemCategoryValue, not {type(self.category).__name__}"
-            )
-        if not isinstance(self.description, str):
-            raise ItemError(
-                f"Description must be a string, not {type(self.description).__name__}"
-            )
-        if not isinstance(self.default_quantity, int):
-            raise ItemError(
-                f"Quantity must be an integer, not {type(self.quantity).__name__}"
-            )
-        if self.default_quantity < 0:
-            raise ItemError(
-                f"Quantity must be non-negative, not {self.default_quantity}"
-            )
-        if self.default_quantity > MAX_ITEM_QUANTITY:
-            raise ItemError(
-                f"Quantity must be less than {MAX_ITEM_QUANTITY}, not {self.default_quantity}"
-            )
-
-    def validate(self, pokemon) -> bool:
-        """Validate if the item can be used on the given Pokémon."""
-        if DEBUG:
-            if not isinstance(pokemon, Pokemon):
-                raise ItemError("Target must be an instance of Pokemon")
+    def can_use(self, target: Pokemon) -> bool:
+        if not target.is_alive:
+            return False
+        if target.status == PokemonStatus.HEALTHY:
+            return False
+        if self.status_list and target.status not in self.status_list:
+            return False
         return True
 
-    def use(self, pokemon) -> list[Message]:
-        """Define the effect of using this item on the given Pokémon."""
-        if DEBUG:
-            if not isinstance(pokemon, Pokemon):
-                raise ItemError("Target must be an instance of Pokemon")
-            if self.quantity == 0:
-                raise ItemError(f"Item {self.name} is out of stock")
-        return []
-
-    def reset(self):
-        self.quantity = self.default_quantity
-
-    def __str__(self) -> str:
-        return f"{self.name} - {self.description} (x{self.quantity})"
-
-    def __repr__(self):
-        return f"Item(id={self.item_id}, name={self.name}, category={self.category}, description={self.description}, quantity={self.quantity})"
-
-    def __hash__(self) -> int:
-        return hash(self.item_id)
-
-    def __eq__(self, other: "Item") -> bool:
-        return self.item_id == other.item_id
-
-    @property
-    def memory_size(self) -> int:
-        return asizeof.asizeof(self)
-
-    @property
-    def one_hot(self) -> torch.Tensor:
-        return ONEHOTCACHE.get_one_hot(len(ITEM_LIST), self.item_id)
-
-    @property
-    def one_hot_description(self) -> torch.Tensor:
-        return ITEM_ONE_HOT_DESCRIPTION
+    def apply(self, target: Pokemon) -> list[Message]:
+        target.status = PokemonStatus.HEALTHY
+        return [Message(f"{target.surname} was cured of its status.")]
 
 
-@dataclass
-class Potion(Item):
-    item_id: int = 0
-    name: str = "Potion"
-    category: ItemCategoryValue = field(default_factory=lambda: ItemCategory.Healing)
-    description: str = "Restores 20 HP"
-    default_quantity: int = 1
+@dataclass(frozen=True, slots=True)
+class ReviveEffect(ItemEffect):
+    percent: int  # 50 or 100
 
-    def __post_init__(self):
-        super().__post_init__()
+    def can_use(self, target: Pokemon) -> bool:
+        return not target.is_alive
 
-    def validate(self, pokemon) -> bool:
-        super().validate(pokemon)
-        return pokemon.hp < pokemon.max_hp and pokemon.is_alive
-
-    def use(self, pokemon) -> list[Message]:
-        super().use(pokemon)
-        previous_hp = pokemon.hp
-        pokemon.hp += 20
-        self.quantity -= 1
-        return [Message(f"{pokemon.surname} restored {pokemon.hp - previous_hp} HP.")]
-
-    __repr__ = Item.__repr__
-    __str__ = Item.__str__
-    __hash__ = Item.__hash__
-    __eq__ = Item.__eq__
+    def apply(self, target: Pokemon) -> list[Message]:
+        target.is_alive = True
+        target.hp = (target.max_hp * self.percent) // 100
+        target.status = PokemonStatus.HEALTHY
+        return [Message(f"{target.surname} was revived!")]
 
 
-@dataclass
-class SuperPotion(Item):
-    item_id: int = 1
-    name: str = "Super Potion"
-    category: ItemCategoryValue = field(default_factory=lambda: ItemCategory.Healing)
-    description: str = "Restores 50 HP"
-    default_quantity: int = 1
+@dataclass(slots=True, frozen=True)
+class Item:
+    """Class representing an item in the game."""
 
-    def __post_init__(self):
-        super().__post_init__()
+    id: int
+    name: str
+    category: ItemCategory
+    description: str
+    effect: ItemEffect
 
-    def validate(self, pokemon) -> bool:
-        super().validate(pokemon)
-        return pokemon.hp < pokemon.max_hp and pokemon.is_alive
+    def can_use(self, target: Pokemon) -> bool:
+        return self.effect.can_use(target)
 
-    def use(self, pokemon) -> list[Message]:
-        super().use(pokemon)
-        previous_hp = pokemon.hp
-        pokemon.hp += 50
-        self.quantity -= 1
-        return [Message(f"{pokemon.surname} restored {pokemon.hp - previous_hp} HP.")]
+    def use(self, target: Pokemon) -> list[Message]:
+        """Use the item on the target Pokémon."""
+        if not self.can_use(target):
+            return [Message("It won't have any effect.")]
+        return self.effect.apply(target)
 
-    __repr__ = Item.__repr__
-    __str__ = Item.__str__
-    __hash__ = Item.__hash__
-    __eq__ = Item.__eq__
+    def __repr__(self) -> str:
+        return f"<Item: {self.name}>"
 
 
-@dataclass
-class FullHeal(Item):
-    item_id: int = 2
-    name: str = "Full Heal"
-    category: ItemCategoryValue = field(default_factory=lambda: ItemCategory.Healing)
-    description: str = "Cures all status conditions"
-    default_quantity: int = 1
-
-    def __post_init__(self):
-        super().__post_init__()
-
-    def validate(self, pokemon) -> bool:
-        super().validate(pokemon)
-        return pokemon.status != PokemonStatus.Healthy
-
-    def use(self, pokemon) -> list[Message]:
-        super().use(pokemon)
-        pokemon.status = PokemonStatus.Healthy
-        self.quantity -= 1
-        return [Message(f"{pokemon.surname} was fully cured.")]
-
-    __repr__ = Item.__repr__
-    __str__ = Item.__str__
-    __hash__ = Item.__hash__
-    __eq__ = Item.__eq__
+# --- Registry System ---
 
 
-@dataclass
-class Revive(Item):
-    item_id: int = 3
-    name: str = "Revive"
-    category: ItemCategoryValue = field(default_factory=lambda: ItemCategory.Healing)
-    description: str = "Revives a fainted Pokémon with 50% HP"
-    default_quantity: int = 1
+class ItemRegistry:
+    _items: list[Item] = []
+    _map: dict[str, Item] = {}
 
-    def __post_init__(self):
-        super().__post_init__()
+    @classmethod
+    def register(
+        cls,
+        name: str,
+        category: ItemCategory,
+        effect: ItemEffect,
+        desc: str,
+    ) -> Item:
+        item_id = len(cls._items)
+        item = Item(item_id, name, category, desc, effect)
 
-    def validate(self, pokemon) -> bool:
-        super().validate(pokemon)
-        return not pokemon.is_alive
+        cls._items.append(item)
+        key = name.replace(" ", "").lower()
+        if key in cls._map:
+            raise ItemError(f"Duplicate item name: {name}")
+        cls._map[key] = item
+        return item
 
-    def use(self, pokemon) -> list[Message]:
-        super().use(pokemon)
-        pokemon.hp = pokemon.max_hp // 2
-        self.quantity -= 1
-        return [Message(f"{pokemon.surname} was revived with 50% HP.")]
+    @classmethod
+    def get(cls, name_or_id: str | int) -> Item | None:
+        if isinstance(name_or_id, int):
+            if 0 <= name_or_id < len(cls._items):
+                return cls._items[name_or_id]
+            return None
+        return cls._map.get(str(name_or_id).replace(" ", "").lower())
 
-    __repr__ = Item.__repr__
-    __str__ = Item.__str__
-    __hash__ = Item.__hash__
-    __eq__ = Item.__eq__
+    @classmethod
+    def all(cls) -> list[Item]:
+        return cls._items
 
 
-ITEM_LIST = [Potion, SuperPotion, FullHeal, Revive]
+# --- Registration ---
 
-ITEM_MAP = {item.name.replace(" ", "").lower(): item for item in ITEM_LIST}
-
-assert len({item.item_id for item in ITEM_LIST}) == len(ITEM_LIST), "Duplicate Item IDs"
-
-assert all(item.item_id == index for index, item in enumerate(ITEM_LIST)), (
-    "Invalid Item IDs"
+Potion = ItemRegistry.register(
+    "Potion", ItemCategory.MEDICINE, HealHP(20), "Restores 20 HP."
 )
 
+SuperPotion = ItemRegistry.register(
+    "Super Potion", ItemCategory.MEDICINE, HealHP(50), "Restores 50 HP."
+)
 
-class _ItemAccessor:
-    def __getattr__(self, attr: str) -> Item:
-        t = ITEM_MAP.get(attr.lower())
-        if t:
-            return t
-        raise AttributeError(f"No Item named '{attr}'")
+HyperPotion = ItemRegistry.register(
+    "Hyper Potion", ItemCategory.MEDICINE, HealHP(200), "Restores 200 HP."
+)
 
-    def __iter__(self):
-        return iter(ITEM_LIST)
+FullHeal = ItemRegistry.register(
+    "Full Heal",
+    ItemCategory.MEDICINE,
+    HealStatus(),
+    "Cures all status problems.",
+)
 
-    def __len__(self):
-        return len(ITEM_LIST)
+Revive = ItemRegistry.register(
+    "Revive",
+    ItemCategory.MEDICINE,
+    ReviveEffect(50),
+    "Revives a fainted Pokémon with half HP.",
+)
 
-    def __repr__(self):
-        return "Items(" + ", ".join(t.name for t in ITEM_LIST) + ")"
+MaxRevive = ItemRegistry.register(
+    "Max Revive",
+    ItemCategory.MEDICINE,
+    ReviveEffect(100),
+    "Revives a fainted Pokémon with full HP.",
+)
 
-    def by_id(self, item_id: int) -> Item:
-        return ITEM_LIST[item_id]
-
-    def get(self, name: str) -> Item | None:
-        return ITEM_MAP.get(name)
-
-    @property
-    def names(self) -> list[str]:
-        return list(ITEM_MAP.keys())
-
-
-ItemAccessor = _ItemAccessor()
+# --- Accessor Helper ---
 
 
-ITEM_ONE_HOT_DESCRIPTION = [item.name for item in ItemAccessor]
+class _ItemsMeta(type):
+    def __getattr__(cls, name: str) -> Item:
+        item = ItemRegistry.get(name)
+        if item:
+            return item
+        raise AttributeError(f"Item '{name}' not found")
 
-ITEM_ONE_HOT_PADDING = torch.tensor([0] * (len(ITEM_LIST)))
+
+class Items(metaclass=_ItemsMeta):
+    """
+    Access point for all registered items.
+    Usage: Items.Potion, Items.Revive.
+    """
+
+    pass

@@ -38,13 +38,15 @@ class PokemonType(IntEnum):
     STEEL = 17
     FAIRY = 18
 
-    def effectiveness_against(
-        self, defenders: tuple[PokemonType, PokemonType]
-    ) -> float:
+    def effectiveness_against(self, defenders: tuple[PokemonType, ...]) -> float:
         """
-        O(N) lookup using the precomputed global matrix.
-        Since N is max 2, this is effectively O(1).
+        Calculates the effectiveness multiplier of this type attacking
+        the given defender types.
+
+        Complexity: O(1)
         """
+        if len(defenders) == 1:
+            return _EFFECTIVENESS_CHART[self][defenders[0]]
         return _EFFECTIVENESS_CHART_3D[self][defenders[0]][defenders[1]]
 
     @property
@@ -58,8 +60,6 @@ class PokemonType(IntEnum):
         return self.label.capitalize()
 
 
-# 3. Configuration Data (Declarative, easy to read/edit)
-# Using string names here avoids circular reference issues during definition.
 _RAW_CONFIG: dict[PokemonType, TypeConfig] = {
     PokemonType.NONETYPE: TypeConfig("Nonetype"),
     PokemonType.NORMAL: TypeConfig(
@@ -172,7 +172,6 @@ _RAW_CONFIG: dict[PokemonType, TypeConfig] = {
 }
 
 
-# 4. The "Magic" - Precomputing the Global Matrix
 def _build_effectiveness_chart() -> tuple[tuple[float, ...], ...]:
     """
     Builds a 2D immutable matrix of float multipliers.
@@ -195,11 +194,9 @@ def _build_effectiveness_chart() -> tuple[tuple[float, ...], ...]:
             elif atk_name in def_cfg.resistances:
                 matrix[attacker][defender] = 0.5
 
-    # Convert to tuple of tuples for immutability and slight speed boost
     return tuple(tuple(row) for row in matrix)
 
 
-# Execute precomputation on module import
 _TYPE_CONFIGS: Final = _RAW_CONFIG
 _EFFECTIVENESS_CHART: Final[tuple[tuple[float, ...], ...]] = (
     _build_effectiveness_chart()
@@ -224,7 +221,6 @@ def _build_effectiveness_chart_3d() -> tuple[tuple[float, ...], ...]:
     return tuple(tuple(tuple(row) for row in plane) for plane in matrix)
 
 
-# Execute precomputation on module import
 _EFFECTIVENESS_CHART_3D: Final[tuple[tuple[float, ...], ...]] = (
     _build_effectiveness_chart_3d()
 )
@@ -244,14 +240,6 @@ if __name__ == "__main__":
     labels = [t.label for t in PokemonType]
 
     # 2. Define a Custom Discrete Colormap
-    # 0.0 = Grey (Immune)
-    # 0.5 = Red (Not Very Effective)
-    # 1.0 = White (Neutral)
-    # 2.0 = Green (Super Effective)
-    custom_colors = ["#e0e0e0", "#ffadad", "#ffffff", "#9bf6ff", "#caffbf"]
-    # Note: I added a slot for 1.0-2.0 just in case, but we map specific boundaries below.
-
-    # We map specific values to colors:
     # 0.0 -> Grey, 0.5 -> Red, 1.0 -> White, 2.0 -> Green
     cmap = colors.ListedColormap(["#7f8c8d", "#e74c3c", "#ecf0f1", "#2ecc71"])
     bounds = [0, 0.1, 0.9, 1.1, 2.1]

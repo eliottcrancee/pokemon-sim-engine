@@ -1,32 +1,35 @@
 import os
+import sys
 import re
 import time
 from collections import deque
+import readchar
+import readchar.key
 
 from colorama import Fore, Style, init
 
-from pokemon.action import Action
+# Assume these imports exist as per prompt instructions
+from pokemon.action import Action, ActionType
 from pokemon.agents import BaseAgent, InputAgent
 from pokemon.battle import Battle
 from pokemon.pokemon import Pokemon, PokemonStatus
 from pokemon.trainer import Trainer
+from pokemon.item import ItemRegistry # Added for ItemRegistry
 
 # Initialize colorama
 init(autoreset=True)
 
 # Constants for UI
 BATTLE_SCREEN_WIDTH = 80
-BATTLE_SCREEN_HEIGHT = 24  # Standard terminal height
-MESSAGE_BOX_HEIGHT = 7
-POKEMON_DISPLAY_HEIGHT = 6
-TRAINER_DISPLAY_HEIGHT = 2
-STATUS_EFFECTS_HEIGHT = 2
-ACTION_MENU_HEIGHT = 5
+BATTLE_SCREEN_HEIGHT = 30
+MESSAGE_BOX_HEIGHT = 8
+TEXT_DELAY = 0.01  # Seconds between characters for the typewriter effect
 
 # Colors
 COLOR_HP_HIGH = Fore.GREEN
 COLOR_HP_MID = Fore.YELLOW
 COLOR_HP_LOW = Fore.RED
+COLOR_HP_EMPTY = Fore.LIGHTBLACK_EX  # Dark Gray for empty HP bar
 COLOR_POKEMON_NAME = Fore.CYAN + Style.BRIGHT
 COLOR_TRAINER_NAME = Fore.MAGENTA + Style.BRIGHT
 COLOR_MESSAGE = Fore.WHITE
@@ -37,27 +40,59 @@ COLOR_SELECTED_MENU = Fore.YELLOW + Style.BRIGHT
 COLOR_FADED = Fore.BLACK + Style.BRIGHT
 
 
+def get_action_description(action: Action, battle: Battle, trainer_id: int) -> str:
+    trainer = battle.get_trainer_by_id(trainer_id)
+    if action.action_type == ActionType.ATTACK:
+        pokemon = trainer.active_pokemon
+        if action.move_slot_index == -1:  # Struggle
+            move_name = "Struggle"
+            pp_info = "---"
+        else:
+            move_slot = pokemon.move_slots[action.move_slot_index]
+            move_name = move_slot.move.name
+            pp_info = f"PP: {move_slot.current_pp}/{move_slot.max_pp}"
+        return f"Attack {move_name} ({pp_info})"
+    elif action.action_type == ActionType.SWITCH:
+        pokemon_to_switch = trainer.pokemon_team[action.pokemon_index]
+        return f"Switch to {pokemon_to_switch.surname} (PV: {pokemon_to_switch.hp}/{pokemon_to_switch.max_hp})"
+    elif action.action_type == ActionType.USE_ITEM:
+        target_pokemon = trainer.pokemon_team[action.target_index]
+        item_name = ItemRegistry.get(action.item_id).name
+        return f"Use {item_name} on {target_pokemon.surname} (PV: {target_pokemon.hp}/{target_pokemon.max_hp})"
+    elif action.action_type == ActionType.PASS:
+        return "Wait (Opponent is switching)"
+    return str(action)
+
+
 def strip_ansi(text: str) -> str:
     """Removes ANSI escape codes from a string."""
-    ansi_escape = re.compile(r"\x1B(?:[@-Z\\-_]|[[0-?]*[ -/]*[@-~])")
+    ansi_escape = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
     return ansi_escape.sub("", text)
 
 
-def right_align(text: str, width: int = BATTLE_SCREEN_WIDTH) -> str:
-    """Aligns text to the right, accounting for ANSI codes."""
-    visible_length = len(strip_ansi(text))
-    padding = max(0, width - visible_length)
-    return " " * padding + text
+def get_visible_length(text: str) -> int:
+    """Returns the length of the string excluding ANSI codes."""
+    return len(strip_ansi(text))
+
+
+def pad_visible(text: str, width: int, align_right: bool = False) -> str:
+    """Pads a string containing ANSI codes to a specific visual width."""
+    vis_len = get_visible_length(text)
+    padding_needed = max(0, width - vis_len)
+
+    if align_right:
+        return (" " * padding_needed) + text
+    else:
+        return text + (" " * padding_needed)
 
 
 def clear_screen():
-    """Clears the terminal screen."""
     os.system("cls" if os.name == "nt" else "clear")
 
 
 def move_cursor_home():
     """Moves cursor to top-left without clearing screen."""
-    print("\033[H", end="")
+    print("\033[H", end="", flush=True)
 
 
 def draw_box(
@@ -69,46 +104,48 @@ def draw_box(
 ) -> list[str]:
     """Draws a box around the given lines of text."""
     box_lines = []
-    inner_width = width - 2 - 2 * padding  # Account for borders and padding
+    inner_width = width - 2 - (2 * padding)
 
+    # --- Top Border ---
+    top_border = "╔" + "═" * (width - 2) + "╗"
     if title:
-        # Adjust inner_width for title if it's too long
-        if len(title) > inner_width - 2:
-            title = title[: inner_width - 5] + "..."
+        clean_title = f" {title} "
+        title_vis_len = len(clean_title)
+        if title_vis_len < (width - 4):
+            left_side_len = (width - 2 - title_vis_len) // 2
+            right_side_len = (width - 2) - left_side_len - title_vis_len
+            top_border = (
+                "╔" + ("═" * left_side_len) + clean_title + ("═" * right_side_len) + "╗"
+            )
+
+    box_lines.append(color + top_border + Style.RESET_ALL)
+
+    # --- Content ---
+    for line in lines:
+        if get_visible_length(line) > inner_width:
+            line = strip_ansi(line)[:inner_width]
+
+        padded_line = pad_visible(line, inner_width)
+
         box_lines.append(
             color
-            + "╔"
-            + "═" * ((inner_width - len(title)) // 2 - 1)
-            + " "
-            + title
-            + " "
-            + "═"
-            * (
-                (inner_width - len(title)) // 2
-                - 1
-                + (1 if (inner_width - len(title)) % 2 != 0 else 0)
-            )
-            + "╗"
+            + "║"
+            + (" " * padding)
+            + padded_line
+            + (" " * padding)
+            + color
+            + "║"
             + Style.RESET_ALL
         )
-    else:
-        box_lines.append(color + "╔" + "═" * (width - 2) + "╗" + Style.RESET_ALL)
 
-    for line in lines:
-        # Truncate or pad line to fit within the inner width
-        if len(line) > inner_width:
-            line = line[:inner_width]
-        padded_line = line.ljust(inner_width)
-        box_lines.append(
-            color + " " * padding + padded_line + " " * padding + Style.RESET_ALL
-        )
-
+    # --- Bottom Border ---
     box_lines.append(color + "╚" + "═" * (width - 2) + "╝" + Style.RESET_ALL)
     return box_lines
 
 
 def get_hp_color(current_hp: int, max_hp: int) -> str:
-    """Returns a color based on the percentage of HP remaining."""
+    if max_hp == 0:
+        return COLOR_HP_LOW
     percentage = current_hp / max_hp
     if percentage > 0.5:
         return COLOR_HP_HIGH
@@ -119,32 +156,40 @@ def get_hp_color(current_hp: int, max_hp: int) -> str:
 
 
 def display_pokemon_stats(pokemon: Pokemon, is_opponent: bool = False) -> list[str]:
-    """Generates lines to display a Pokémon's stats."""
     lines = []
     name_line = (
         f"{COLOR_POKEMON_NAME}{pokemon.surname}{Style.RESET_ALL} (L{pokemon.level})"
     )
+
     hp_bar_length = 20
-    current_hp = pokemon.hp
+    current_hp = max(0, pokemon.hp)
     max_hp = pokemon.max_hp
     hp_color = get_hp_color(current_hp, max_hp)
-    hp_percentage = current_hp / max_hp
+
+    if max_hp > 0:
+        hp_percentage = current_hp / max_hp
+    else:
+        hp_percentage = 0
+
     filled_length = int(hp_bar_length * hp_percentage)
+
+    # --- FIXED: Use solid block with Dark Gray color for the empty part ---
     hp_bar = (
         hp_color
         + "█" * filled_length
-        + Fore.WHITE
-        + "░" * (hp_bar_length - filled_length)
+        + COLOR_HP_EMPTY  # Dark Gray
+        + "█" * (hp_bar_length - filled_length)  # Solid block
         + Style.RESET_ALL
     )
+
     hp_line = f"HP: {hp_bar} {current_hp}/{max_hp}"
 
     status_conditions = []
-    if pokemon.status != PokemonStatus.Healthy:
-        status_conditions.append(str(pokemon.status))
-    if pokemon._confused:
+    if pokemon.status != PokemonStatus.HEALTHY:
+        status_conditions.append(str(pokemon.status.name))
+    if pokemon.confused:
         status_conditions.append("Confused")
-    if pokemon._taunted:
+    if pokemon.taunted:
         status_conditions.append("Taunted")
 
     status_line = "Status: "
@@ -158,286 +203,215 @@ def display_pokemon_stats(pokemon: Pokemon, is_opponent: bool = False) -> list[s
         lines.append(hp_line)
         lines.append(status_line)
     else:
-        lines.append(right_align(name_line))
-        lines.append(right_align(hp_line))
-        lines.append(right_align(status_line))
+        lines.append(pad_visible(name_line, BATTLE_SCREEN_WIDTH, align_right=True))
+        lines.append(pad_visible(hp_line, BATTLE_SCREEN_WIDTH, align_right=True))
+        lines.append(pad_visible(status_line, BATTLE_SCREEN_WIDTH, align_right=True))
     return lines
 
 
 def display_trainer_info(trainer: Trainer, is_opponent: bool = False) -> list[str]:
-    """Generates lines to display trainer information."""
     lines = []
     trainer_name = f"{COLOR_TRAINER_NAME}{trainer.name}{Style.RESET_ALL}"
-
     if is_opponent:
         lines.append(trainer_name)
     else:
-        lines.append(right_align(trainer_name))
+        lines.append(pad_visible(trainer_name, BATTLE_SCREEN_WIDTH, align_right=True))
     return lines
 
 
 def display_message_box(messages: deque) -> list[str]:
-    """Generates lines for the message box."""
     box_content = []
-    # Display only the most recent messages that fit
-    for msg in list(messages)[-(MESSAGE_BOX_HEIGHT - 2) :]:
+    visible_lines = MESSAGE_BOX_HEIGHT - 2
+
+    msg_list = list(messages)
+    display_msgs = (
+        msg_list[-visible_lines:] if len(msg_list) > visible_lines else msg_list
+    )
+
+    for msg in display_msgs:
         box_content.append(f"{COLOR_MESSAGE}{msg}{Style.RESET_ALL}")
-    # Pad with empty lines if there are fewer messages than box height
-    while len(box_content) < MESSAGE_BOX_HEIGHT - 2:
+
+    while len(box_content) < visible_lines:
         box_content.append("")
+
     return draw_box(box_content, title="Messages", color=Fore.YELLOW)
 
 
-def display_action_menu(actions: list[Action], selected_index: int = 0) -> list[str]:
-    """Generates lines for the action menu."""
+def display_action_menu(
+    actions: list[Action], battle: Battle, trainer_id: int, selected_index: int = 0
+) -> list[str]:
     menu_lines = []
     for i, action in enumerate(actions):
         prefix = f"[{i + 1}] "
-        action_str = action.description
+        action_str = get_action_description(action, battle, trainer_id)
+
         if i == selected_index:
             menu_lines.append(
                 f"{COLOR_SELECTED_MENU}> {prefix}{action_str}{Style.RESET_ALL}"
             )
         else:
             menu_lines.append(f"{COLOR_MENU}  {prefix}{action_str}{Style.RESET_ALL}")
-    # Pad with empty lines
-    while len(menu_lines) < ACTION_MENU_HEIGHT - 2:
-        menu_lines.append("")
+
     return draw_box(menu_lines, title="Actions", color=Fore.BLUE)
 
 
 def play_ui(battle: Battle, agent_0: BaseAgent, agent_1: BaseAgent):
-    message_history = deque(
-        maxlen=MESSAGE_BOX_HEIGHT * 2
-    )  # Keep more history than displayed
+    battle.headless = False
+    message_history = deque(maxlen=20)
 
     def hide_cursor():
-        print("\033[?25l", end="")
+        print("\033[?25l", end="", flush=True)
 
     def show_cursor():
-        print("\033[?25h", end="")
+        print("\033[?25h", end="", flush=True)
 
     def add_message(msg: str):
         message_history.append(msg)
 
-    def render_ui(streaming_text: str = None, clear: bool = False):
-        if clear:
-            clear_screen()
-        else:
-            move_cursor_home()
+    def render_screen(
+        possible_actions=None, selected_index=0, streaming_text=None, input_mode=False
+    ):
+        """
+        Consolidated rendering function.
+        """
+        move_cursor_home()
 
         ui_lines = []
 
-        # Opponent's Trainer and Pokemon
-        ui_lines.extend(display_trainer_info(battle.trainer_1, is_opponent=True))
+        # 1. Opponent Info
+        ui_lines.extend(display_trainer_info(battle.trainers[1], is_opponent=True))
         ui_lines.extend(
-            display_pokemon_stats(battle.trainer_1.pokemon_team[0], is_opponent=True)
+            display_pokemon_stats(battle.trainers[1].active_pokemon, is_opponent=True)
         )
-        ui_lines.append("")  # Spacer
+        ui_lines.append(" " * BATTLE_SCREEN_WIDTH)
 
-        # Player's Trainer and Pokemon
-        ui_lines.extend(display_pokemon_stats(battle.trainer_0.pokemon_team[0]))
-        ui_lines.extend(display_trainer_info(battle.trainer_0))
-        ui_lines.append("")  # Spacer
+        # 2. Player Info
+        ui_lines.extend(display_pokemon_stats(battle.trainers[0].active_pokemon))
+        ui_lines.extend(display_trainer_info(battle.trainers[0]))
+        ui_lines.append(" " * BATTLE_SCREEN_WIDTH)
 
-        # Message Box
-        msgs_to_display = list(message_history)
-        if streaming_text:
+        # 3. Message Box
+        msgs_to_display = deque(list(message_history))
+        if streaming_text is not None:
             msgs_to_display.append(streaming_text)
+        ui_lines.extend(display_message_box(msgs_to_display))
 
-        ui_lines.extend(
-            display_message_box(
-                msgs_to_display
+        # 4. Action Menu (Dynamic)
+        if input_mode and possible_actions:
+            ui_lines.extend(
+                display_action_menu(possible_actions, battle, 0, selected_index)
             )
-        )  # Display only the most recent messages that fit
+            ui_lines.append(
+                pad_visible(
+                    f"{COLOR_MENU}Use arrows to navigate, Enter to select, Q to quit.{Style.RESET_ALL}",
+                    BATTLE_SCREEN_WIDTH,
+                )
+            )
 
-        # Pad lines to ensure we overwrite previous content
-        final_lines = []
+        # 5. Fill remaining screen
+        remaining_lines = BATTLE_SCREEN_HEIGHT - len(ui_lines)
+        if remaining_lines > 0:
+            for _ in range(remaining_lines):
+                ui_lines.append(" " * BATTLE_SCREEN_WIDTH)
+
+        # 6. Print
         for line in ui_lines:
-            # Calculate visible length to pad correctly
-            visible_len = len(strip_ansi(line))
-            padding = max(0, BATTLE_SCREEN_WIDTH - visible_len)
-            final_lines.append(line + " " * padding)
+            print(pad_visible(line, BATTLE_SCREEN_WIDTH))
 
-        # Pad vertically to screen height to clear bottom of screen
-        while len(final_lines) < BATTLE_SCREEN_HEIGHT:
-            final_lines.append(" " * BATTLE_SCREEN_WIDTH)
-
-        # Print all UI lines
-        for line in final_lines:
-            print(line)
+        sys.stdout.flush()
 
     def animate_message(text: str):
-        # Simple streaming animation
-        # Render initial state without clearing (overwriting)
-        render_ui(streaming_text="", clear=False)
+        current_text = ""
+        for char in text:
+            current_text += char
+            render_screen(streaming_text=current_text, input_mode=False)
+            time.sleep(TEXT_DELAY)
 
-        for i in range(1, len(text) + 1):
-            # Use cursor reset instead of clear for smooth animation
-            render_ui(streaming_text=text[:i], clear=False)
-            time.sleep(0.01)
+        time.sleep(0.5)
         add_message(text)
-        # Final render to commit message to history, overwriting
-        render_ui(clear=False)
+        render_screen(input_mode=False)
 
     hide_cursor()
     try:
         battle.reset()
-        # Clear screen once at the very beginning
         clear_screen()
-        animate_message(
-            f"Battle started: {battle.trainer_0.name} vs {battle.trainer_1.name}!"
+        add_message(
+            f"Battle started: {battle.trainers[0].name} vs {battle.trainers[1].name}!"
         )
+        render_screen()
+        time.sleep(0.5)
 
         while not battle.done:
-            # Get actions
             action_0 = None
             action_1 = None
 
-            # Trainer 0's action
+            # --- Trainer 0 (Player) ---
             if isinstance(agent_0, InputAgent):
                 possible_actions = battle.get_possible_actions(0)
                 selected_index = 0
+
                 while action_0 is None:
-                    clear_screen()
-                    ui_lines = []
-                    ui_lines.extend(
-                        display_trainer_info(battle.trainer_1, is_opponent=True)
-                    )
-                    ui_lines.extend(
-                        display_pokemon_stats(
-                            battle.trainer_1.pokemon_team[0], is_opponent=True
-                        )
-                    )
-                    ui_lines.append("")
-                    ui_lines.extend(
-                        display_pokemon_stats(battle.trainer_0.pokemon_team[0])
-                    )
-                    ui_lines.extend(display_trainer_info(battle.trainer_0))
-                    ui_lines.append("")
-                    ui_lines.extend(
-                        display_message_box(
-                            deque(list(message_history)[-MESSAGE_BOX_HEIGHT + 2 :])
-                        )
-                    )
-                    ui_lines.extend(
-                        display_action_menu(possible_actions, selected_index)
+                    render_screen(
+                        possible_actions=possible_actions,
+                        selected_index=selected_index,
+                        input_mode=True,
                     )
 
-                    for line in ui_lines:
-                        print(line)
+                    key = readchar.readkey()
 
-                    # Handle input for menu navigation
-                    print(f"{COLOR_MENU}Use Z/S to navigate, E to select, A to quit.{Style.RESET_ALL}")
-                    choice = input().lower()
-
-                    if choice == "z":
+                    if key == readchar.key.UP:
                         selected_index = (selected_index - 1) % len(possible_actions)
-                    elif choice == "s":
+                    elif key == readchar.key.DOWN:
                         selected_index = (selected_index + 1) % len(possible_actions)
-                    elif choice == "e":
+                    elif key == readchar.key.ENTER:
                         action_0 = possible_actions[selected_index]
-                    elif choice == "a":
-                        animate_message(
+                    elif key == "q" or key == "\x03":
+                        add_message(
                             f"{COLOR_ERROR}Player quit the battle.{Style.RESET_ALL}"
                         )
-                        battle.winner = 1  # Opponent wins if player quits
-                        break
-                    else:
-                        animate_message(
-                            f"{COLOR_WARNING}Invalid input. Please use Z, S, E, or A.{Style.RESET_ALL}"
-                        )
-                        time.sleep(0.5)  # Give user time to read warning
+                        battle.winner = 1
+                        return
             else:
-                action_0 = agent_0.get_action(battle, 0, verbose=True)
+                action_0 = agent_0.get_action(battle.copy(), 0, verbose=True)
 
-            if battle.done:  # Check if player quit
+            if battle.done:
                 break
 
-            # Trainer 1's action
+            # --- Trainer 1 (Opponent) ---
             if isinstance(agent_1, InputAgent):
-                possible_actions = battle.get_possible_actions(1)
-                selected_index = 0
-                while action_1 is None:
-                    clear_screen()
-                    ui_lines = []
-                    ui_lines.extend(
-                        display_trainer_info(battle.trainer_1, is_opponent=True)
-                    )
-                    ui_lines.extend(
-                        display_pokemon_stats(
-                            battle.trainer_1.pokemon_team[0], is_opponent=True
-                        )
-                    )
-                    ui_lines.append("")
-                    ui_lines.extend(
-                        display_pokemon_stats(battle.trainer_0.pokemon_team[0])
-                    )
-                    ui_lines.extend(display_trainer_info(battle.trainer_0))
-                    ui_lines.append("")
-                    ui_lines.extend(
-                        display_message_box(
-                            deque(list(message_history)[-MESSAGE_BOX_HEIGHT + 2 :])
-                        )
-                    )
-                    ui_lines.extend(
-                        display_action_menu(possible_actions, selected_index)
-                    )
-
-                    for line in ui_lines:
-                        print(line)
-
-                    print(f"{COLOR_MENU}Use Z/S to navigate, E to select, A to quit.{Style.RESET_ALL}")
-                    choice = input().lower()
-
-                    if choice == "z":
-                        selected_index = (selected_index - 1) % len(possible_actions)
-                    elif choice == "s":
-                        selected_index = (selected_index + 1) % len(possible_actions)
-                    elif choice == "e":
-                        action_1 = possible_actions[selected_index]
-                    elif choice == "a":
-                        animate_message(
-                            f"{COLOR_ERROR}Player quit the battle.{Style.RESET_ALL}"
-                        )
-                        battle.winner = 0  # Opponent wins if player quits
-                        break
-                    else:
-                        animate_message(
-                            f"{COLOR_WARNING}Invalid input. Please use Z, S, E, or A.{Style.RESET_ALL}"
-                        )
-                        time.sleep(0.5)  # Give user time to read warning
+                action_1 = battle.get_possible_actions(1)[0]
             else:
-                action_1 = agent_1.get_action(battle, 1, verbose=True)
+                action_1 = agent_1.get_action(battle.copy(), 1, verbose=True)
 
-            if battle.done:  # Check if player quit
+            if battle.done:
                 break
 
-            # Execute turn
+            # --- Turn Execution ---
+            render_screen(input_mode=False)
             turn_messages = battle.turn(action_0, action_1)
+
             for msg in turn_messages:
                 animate_message(str(msg))
-                time.sleep(1.0)  # Delay for message readability
 
-            render_ui()  # Final render after all messages for the turn
-            time.sleep(1)  # Pause before next turn
+            time.sleep(0.5)
 
-        # Battle ended
+        # --- End Game ---
         clear_screen()
-
         if battle.tie:
-            animate_message(
-                f"{COLOR_WARNING}The battle ended in a tie!{Style.RESET_ALL}"
-            )
+            print(f"{COLOR_WARNING}The battle ended in a tie!{Style.RESET_ALL}")
         elif battle.winner == 0:
-            animate_message(
-                f"{COLOR_TRAINER_NAME}{battle.trainer_0.name}{Style.RESET_ALL} wins the battle!"
+            print(
+                f"{COLOR_TRAINER_NAME}{battle.trainers[0].name}{Style.RESET_ALL} wins the battle!"
             )
         elif battle.winner == 1:
-            animate_message(
-                f"{COLOR_TRAINER_NAME}{battle.trainer_1.name}{Style.RESET_ALL} wins the battle!"
+            print(
+                f"{COLOR_TRAINER_NAME}{battle.trainers[1].name}{Style.RESET_ALL} wins the battle!"
             )
 
-        time.sleep(2)  # Final pause
+        time.sleep(2)
+
+    except KeyboardInterrupt:
+        pass
     finally:
         show_cursor()
+        print(Style.RESET_ALL)

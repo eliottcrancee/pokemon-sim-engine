@@ -1,675 +1,825 @@
-# pokemon.py
+from __future__ import annotations
 
 import random
-from dataclasses import dataclass, field
-from functools import cached_property
+from dataclasses import dataclass
+from typing import Final, Optional
 
-import torch
-from pympler import asizeof
-
-from pokemon.config import DEBUG
 from pokemon.message import Message
-from pokemon.move import Move, MoveAccessor
-from pokemon.pokemon_type import PokemonType, PokemonTypeAccessor
-from pokemon.tensor_cache import ONEHOTCACHE
+from pokemon.move import Move, MoveRegistry
+from pokemon.pokemon_status import PokemonStatus
+from pokemon.pokemon_type import PokemonType
 
-STAT_MODIFIER = [0.25, 0.29, 0.33, 0.40, 0.50, 0.67, 1, 1.5, 2, 2.5, 3, 3.5, 4]
+_STAT_STAGE_MULTIPLIERS: Final[tuple[float, ...]] = (
+    0.25,  # -6 to -1
+    0.29,
+    0.33,
+    0.40,
+    0.50,
+    0.67,
+    1.0,  # 0
+    1.5,
+    2.0,
+    2.5,
+    3.0,
+    3.5,
+    4.0,  # +1 to +6
+)
 
 
 class PokemonError(Exception):
-    """Custom exception for validation errors."""
-
-    def __init__(self, message):
-        super().__init__(message)
-        self.message = message
+    pass
 
 
-class PokemonStatusValue:
-    """Class representing a value in the PokemonStatus enum."""
+@dataclass(slots=True)
+class MoveSlot:
+    """
+    Represents a learned move and its current PP.
+    """
 
-    def __init__(self, value: int, name: str):
-        self.value = value
-        self.name = name
+    move: Move
+    current_pp: int
+    max_pp: int
 
-    def __str__(self):
-        return self.name
+    @classmethod
+    def from_move(cls, move: Move) -> MoveSlot:
+        return cls(move, move.pp, move.pp)
+
+    def reset(self):
+        self.current_pp = self.max_pp
+
+    def copy(self) -> MoveSlot:
+        return MoveSlot(self.move, self.current_pp, self.max_pp)
 
     def __eq__(self, other):
-        return self.value == other.value
+        if not isinstance(other, MoveSlot):
+            return NotImplemented
+        return self.move.id == other.move.id and self.current_pp == other.current_pp
 
-    @property
-    def one_hot(self) -> list[int]:
-        return ONEHOTCACHE.get_one_hot(len(STATUS_LIST) + 1, self.value)
-
-    @property
-    def one_hot_description(self) -> list[str]:
-        return POKEMON_STATUS_ONE_HOT_DESCRIPTION
+    def __hash__(self):
+        return hash((self.move.id, self.current_pp))
 
 
-class PokemonStatus:
-    """Enum for Pokemon statuses."""
+@dataclass(frozen=True, slots=True)
+class PokemonSpecies:
+    """
+    Immutable definition of a Pokemon Species.
+    Optimized: 'base_stats' is a tuple for O(1) indexed access matching IVS/EVS.
+    Order: HP, Atk, Def, SpA, SpD, Spe.
+    """
 
-    Healthy = PokemonStatusValue(0, "Healthy")
-    Burn = PokemonStatusValue(1, "Burn")
-
-
-STATUS_LIST = [PokemonStatus.Healthy, PokemonStatus.Burn]
-STATUS_MAP = {status.name: status for status in STATUS_LIST}
-
-POKEMON_STATUS_ONE_HOT_DESCRIPTION = ["Status Padding"] + [
-    status.name.capitalize() for status in STATUS_LIST
-]
-
-POKEMON_STATUS_ONE_HOT_PADDING = torch.tensor([1] + [0] * len(STATUS_LIST))
-
-
-@dataclass
-class Pokemon:
-    pokemon_id: int
+    id: int
     name: str
-    types: set
-    level: int
-    base_hp: int
-    base_attack: int
-    base_defense: int
-    base_sp_attack: int
-    base_sp_defense: int
-    base_speed: int
+    types: tuple[PokemonType, ...]
+    base_stats: tuple[int, int, int, int, int, int]
+    default_moves: tuple[str, ...]
 
-    ev_hp: int = 0
-    ev_attack: int = 0
-    ev_defense: int = 0
-    ev_sp_attack: int = 0
-    ev_sp_defense: int = 0
-    ev_speed: int = 0
-    iv_hp: int = 10
-    iv_attack: int = 10
-    iv_defense: int = 10
-    iv_sp_attack: int = 10
-    iv_sp_defense: int = 10
-    iv_speed: int = 10
-    moves: list[Move] = field(default_factory=list)
 
-    def __post_init__(self):
-        if DEBUG:
-            self.validate_inputs()
-        self.surname = self.name.capitalize()
-        self.status = PokemonStatus.Healthy
-        self._hp = self.max_hp
+class Pokemon:
+    """
+    Highly optimized Pokemon instance.
+    Uses array.array for integer stats to ensure C-like contiguous memory.
+    Implements pre-calculation for stats to ensure O(1) access during battle.
+    """
+
+    __slots__ = (
+        "species",
+        "surname",
+        "level",
+        "_ivs",  # array('H') - Unsigned Short
+        "_evs",  # array('H')
+        "move_slots",
+        "_current_hp",
+        "_max_hp",
+        "_status",
+        "_stat_stages",  # array('b') - Signed Char (-6 to 6)
+        "_raw_stats",  # array('H') - Stats without modifiers
+        "_effective_stats",  # array('H') - Cached stats (Raw * Modifier)
+        "_level_factor",  # float - Pre-calculated damage constant
+        "is_alive",
+        "_confused",
+        "_confused_turns",
+        "_taunted",
+        "_taunted_turns",
+        "_accuracy",
+        "_accuracy_stage",
+        "_sleep_turns",
+    )
+
+    def __init__(
+        self,
+        species: PokemonSpecies,
+        level: int = 5,
+        moves: list[Move] | None = None,
+        ivs: tuple[int, ...] = (10, 10, 10, 10, 10, 10),
+        evs: tuple[int, ...] = (0, 0, 0, 0, 0, 0),
+        surname: str | None = None,
+    ):
+        self.species = species
+        self.level = max(1, min(100, level))
+        self.surname = surname or species.name
+
+        self._ivs = ivs
+        self._evs = evs
+
+        # Pre-calculate Level Factor for damage formula (Math optimization)
+        self._level_factor = (2 * self.level) / 5 + 2
+
+        # Moves Initialization
+        if moves:
+            self.move_slots = [MoveSlot.from_move(m) for m in moves]
+        else:
+            self.move_slots = []
+            for m_name in species.default_moves:
+                m = MoveRegistry.get(m_name)
+                if m:
+                    self.move_slots.append(MoveSlot.from_move(m))
+
+        # Battle State
+        self._status = PokemonStatus.HEALTHY
+        self.is_alive = True
         self._confused = False
         self._confused_turns = 0
         self._taunted = False
         self._taunted_turns = 0
-        self._modifiers = {
-            stat: 0
-            for stat in [
-                "attack",
-                "defense",
-                "sp_attack",
-                "sp_defense",
-                "speed",
-                "accuracy",
-            ]
-        }
-        self._pp = [move.pp for move in self.moves]
+        self._accuracy = 1
+        self._accuracy_stage = 0
+        self._sleep_turns = 0
 
-    def copy(self):
-        cls = self.__class__
-        new_pokemon = cls.__new__(cls)
-        for k, v in self.__dict__.items():
-            if k == "_modifiers":
-                new_pokemon._modifiers = v.copy()
-            elif k == "_pp":
-                new_pokemon._pp = v.copy()
-            elif k == "types":
-                new_pokemon.types = v.copy()
-            else:
-                setattr(new_pokemon, k, v)
-        return new_pokemon
+        # Stats Initialization
+        # 0:Atk, 1:Def, 2:SpA, 3:SpD, 4:Spe (HP is handled separately)
+        self._stat_stages = [0, 0, 0, 0, 0]
+        self._raw_stats = [0, 0, 0, 0, 0]
+        self._effective_stats = [0, 0, 0, 0, 0]
 
-    def validate_inputs(self):
-        if not isinstance(self.pokemon_id, int) or self.pokemon_id < 0:
-            raise PokemonError("Pokemon ID must be a positive integer")
-        if not isinstance(self.name, str) or not self.name:
-            raise PokemonError("Name must be a non-empty string")
-        if not isinstance(self.types, list) or not all(
-            isinstance(t, PokemonType) for t in self.types
-        ):
-            raise PokemonError("Types must be a set of PokemonType")
-        if not isinstance(self.level, int) or not 1 <= self.level <= 100:
-            raise PokemonError("Level must be an integer between 1 and 100")
-        if not isinstance(self.base_hp, int) or not 1 <= self.base_hp <= 255:
-            raise PokemonError("Base HP must be an integer between 1 and 255")
-        if not isinstance(self.base_attack, int) or not 1 <= self.base_attack <= 255:
-            raise PokemonError("Base Attack must be an integer between 1 and 255")
-        if not isinstance(self.base_defense, int) or not 1 <= self.base_defense <= 255:
-            raise PokemonError("Base Defense must be an integer between 1 and 255")
-        if (
-            not isinstance(self.base_sp_attack, int)
-            or not 1 <= self.base_sp_attack <= 255
-        ):
-            raise PokemonError(
-                "Base Special Attack must be an integer between 1 and 255"
-            )
-        if (
-            not isinstance(self.base_sp_defense, int)
-            or not 1 <= self.base_sp_defense <= 255
-        ):
-            raise PokemonError(
-                "Base Special Defense must be an integer between 1 and 255"
-            )
-        if not isinstance(self.base_speed, int) or not 1 <= self.base_speed <= 255:
-            raise PokemonError("Base Speed must be an integer between 1 and 255")
-        if not isinstance(self.moves, list) or not all(
-            isinstance(m, Move) for m in self.moves
-        ):
-            raise PokemonError("Moves must be a list of Move")
+        self._calculate_max_hp()
+        self._current_hp = self._max_hp
 
-    @cached_property
-    def max_hp(self) -> int:
-        return (
-            int((2 * self.base_hp + self.iv_hp + self.ev_hp // 4) * self.level // 100)
-            + self.level
-            + 10
+        # Calculate initial stats
+        self._recalculate_all_stats()
+
+    def _calculate_max_hp(self):
+        """Calculates HP based on Gen 3+ formula."""
+        base = self.species.base_stats[0]
+        iv = self._ivs[0]
+        ev = self._evs[0]
+        self._max_hp = (
+            ((2 * base + iv + (ev // 4)) * self.level) // 100 + self.level + 10
         )
 
-    @cached_property
-    def level_factor(self) -> float:
-        return (2 * self.level) / 5 + 2
+    def _recalculate_all_stats(self):
+        """
+        Calculates Raw stats (Nature/IV/EV/Level) and then updates Effective stats.
+        Call this on Level Up or Spawn.
+        """
+        # Stats indices: 0=HP(skip), 1=Atk, 2=Def, 3=SpA, 4=SpD, 5=Spe
+        # Map to internal arrays: 0=Atk, 1=Def, 2=SpA, 3=SpD, 4=Spe
+
+        # Species stats tuple: (HP, Atk, Def, SpA, SpD, Spe)
+        s_stats = self.species.base_stats
+
+        for i in range(5):
+            # i corresponds to internal arrays.
+            # Species/IV/EV index is i + 1 (skipping HP at index 0)
+            base = s_stats[i + 1]
+            iv = self._ivs[i + 1]
+            ev = self._evs[i + 1]
+
+            # Gen 3+ Formula
+            raw_val = ((2 * base + iv + (ev // 4)) * self.level) // 100 + 5
+            self._raw_stats[i] = raw_val
+
+        # Update effective stats based on stages
+        self._update_effective_stats()
+
+    def _update_effective_stats(self):
+        """
+        Updates cached battle stats based on current Raw Stats and Stages.
+        This provides O(1) read access during battle logic.
+        """
+        for i in range(5):
+            stage = self._stat_stages[i]
+            # Offset index 6 maps to multiplier 1.0
+            # Clamp stage between -6 and +6, then shift by +6 for array index
+            idx = max(0, min(12, stage + 6))
+            mult = _STAT_STAGE_MULTIPLIERS[idx]
+            # Fast int conversion
+            self._effective_stats[i] = int(self._raw_stats[i] * mult)
+
+    # --- Properties for O(1) Access ---
+    @property
+    def id(self) -> int:
+        return self.species.id
+
+    @property
+    def name(self) -> str:
+        return self.species.name
+
+    @property
+    def types(self) -> tuple[PokemonType, ...]:
+        return self.species.types
+
+    @property
+    def max_hp(self) -> int:
+        return self._max_hp
 
     @property
     def hp(self) -> int:
-        return self._hp
+        return self._current_hp
 
     @hp.setter
     def hp(self, value: int):
-        self._hp = max(0, min(value, self.max_hp))
+        # Branchless clamping
+        self._current_hp = value if value < self._max_hp else self._max_hp
+        if self._current_hp <= 0:
+            self._current_hp = 0
+            self.is_alive = False
+            self._status = PokemonStatus.FAINTED
+        else:
+            self.is_alive = True
 
     @property
     def hp_ratio(self) -> float:
-        return self.hp / self.max_hp
+        return self._current_hp / self._max_hp if self._max_hp else 0.0
 
     @property
-    def is_alive(self) -> bool:
-        return self.hp > 0
+    def level_factor(self) -> float:
+        return self._level_factor
 
-    def is_like(self, other) -> bool:
-        return self.pokemon_id == other.pokemon_id
+    @property
+    def status(self) -> PokemonStatus:
+        return self._status
 
-    def calculate_stat(self, base: int, iv: int, ev: int, modifier: int) -> int:
-        stat = int((2 * base + iv + ev // 4) * self.level // 100) + 5
-        return int(stat * STAT_MODIFIER[modifier + 6])
+    @status.setter
+    def status(self, value: PokemonStatus):
+        self._status = value
+        if value != PokemonStatus.SLEEP:
+            self._sleep_turns = 0
 
-    @cached_property
+    @property
+    def taunted(self) -> bool:
+        return self._taunted
+
+    @taunted.setter
+    def taunted(self, value: bool):
+        self._taunted = value
+        if not value:
+            self._taunted_turns = 0
+
+    @property
+    def confused(self) -> bool:
+        return self._confused
+
+    @confused.setter
+    def confused(self, value: bool):
+        self._confused = value
+        if not value:
+            self._confused_turns = 0
+
+    @property
+    def modifiers(self) -> dict[int, int, int, int, int]:
+        return (
+            self._stat_stages[0],
+            self._stat_stages[1],
+            self._stat_stages[2],
+            self._stat_stages[3],
+            self._stat_stages[4],
+        )
+
+    @property
     def attack(self) -> int:
-        return self.calculate_stat(
-            self.base_attack, self.iv_attack, self.ev_attack, self._modifiers["attack"]
-        )
+        return self._effective_stats[0]
 
-    @cached_property
+    @property
     def defense(self) -> int:
-        return self.calculate_stat(
-            self.base_defense,
-            self.iv_defense,
-            self.ev_defense,
-            self._modifiers["defense"],
-        )
+        return self._effective_stats[1]
 
-    @cached_property
+    @property
     def sp_attack(self) -> int:
-        return self.calculate_stat(
-            self.base_sp_attack,
-            self.iv_sp_attack,
-            self.ev_sp_attack,
-            self._modifiers["sp_attack"],
-        )
+        return self._effective_stats[2]
 
-    @cached_property
+    @property
     def sp_defense(self) -> int:
-        return self.calculate_stat(
-            self.base_sp_defense,
-            self.iv_sp_defense,
-            self.ev_sp_defense,
-            self._modifiers["sp_defense"],
-        )
+        return self._effective_stats[3]
 
-    @cached_property
+    @property
     def speed(self) -> int:
-        return self.calculate_stat(
-            self.base_speed, self.iv_speed, self.ev_speed, self._modifiers["speed"]
-        )
+        return self._effective_stats[4]
 
-    def reset_stat(self, stat: str):
-        if DEBUG:
-            if stat not in self._modifiers:
-                raise PokemonError(f"Invalid stat: {stat}")
-        self.__dict__.pop(stat, None)
+    @property
+    def attack_stage(self) -> int:
+        return self._stat_stages[0]
 
-    def apply_modifier(self, stat: str, modifier: int):
-        if DEBUG:
-            if stat not in self._modifiers:
-                raise PokemonError(f"Invalid stat: {stat}")
-        self._modifiers[stat] += modifier
-        if self._modifiers[stat] > 6:
-            self._modifiers[stat] = 6
-        elif self._modifiers[stat] < -6:
-            self._modifiers[stat] = -6
-        self.reset_stat(stat)
+    @property
+    def defense_stage(self) -> int:
+        return self._stat_stages[1]
 
-    def reset_modifiers(self):
-        for stat in self._modifiers:
-            self._modifiers[stat] = 0
-            self.reset_stat(stat)
+    @property
+    def sp_attack_stage(self) -> int:
+        return self._stat_stages[2]
 
-    def clear(self):
-        self.reset_modifiers()
-        self._taunted = False
-        self._taunted_turns = 0
-        self._confused = False
-        self._confused_turns = 0
+    @property
+    def sp_defense_stage(self) -> int:
+        return self._stat_stages[3]
+
+    @property
+    def speed_stage(self) -> int:
+        return self._stat_stages[4]
 
     def reset(self):
-        self.clear()
-        self.hp = self.max_hp
-        self._pp = [move.pp for move in self.moves]
+        self.full_restore()
+        for slot in self.move_slots:
+            slot.reset()
+
+    def full_restore(self):
+        self.restore()
+        self._current_hp = self.max_hp
+        self.is_alive = True
+
+    def restore(self):
+        self._status = PokemonStatus.HEALTHY
+        self._confused = False
+        self._confused_turns = 0
+        self._taunted = False
+        self._taunted_turns = 0
+        self._sleep_turns = 0
+        self.reset_modifiers()
+
+    def reset_modifiers(self):
+        for i in range(5):
+            self._stat_stages[i] = 0
+            self._effective_stats[i] = self._raw_stats[i]
+        self._accuracy_stage = 0
+
+    def apply_modifier(self, stat_index: int, stages: int) -> bool:
+        """
+        stat_index: 0=Atk, 1=Def, 2=SpA, 3=SpD, 4=Spe
+        Returns True if changed.
+        """
+        if not (0 <= stat_index <= 4):
+            return False
+
+        current = self._stat_stages[stat_index]
+        if (stages > 0 and current == 6) or (stages < 0 and current == -6):
+            return False
+
+        new_stage = max(-6, min(6, current + stages))
+        self._stat_stages[stat_index] = new_stage
+
+        idx = new_stage + 6
+        self._effective_stats[stat_index] = int(
+            self._raw_stats[stat_index] * _STAT_STAGE_MULTIPLIERS[idx]
+        )
+        return True
+
+    def apply_accuracy_modifier(self, stages: int) -> bool:
+        """
+        Applies accuracy modifier.
+        Returns True if changed.
+        """
+        current = self._accuracy_stage
+        if (stages > 0 and current == 6) or (stages < 0 and current == -6):
+            return False
+
+        new_stage = max(-6, min(6, current + stages))
+        self._accuracy_stage = new_stage
+        return True
+
+    def decrease_pp(self, move_index: int):
+        slot = self.move_slots[move_index]
+        if slot.current_pp > 0:
+            slot.current_pp -= 1
+
+    def copy(self) -> Pokemon:
+        """
+        Fastest possible deep copy using __new__ to bypass __init__.
+        """
+        new_p = Pokemon.__new__(Pokemon)
+
+        # Reference copy for immutable objects
+        new_p.species = self.species
+        new_p.surname = self.surname
+        new_p.level = self.level
+        new_p._level_factor = self._level_factor
+
+        # Fast Array copying (memory block copy)
+        new_p._ivs = self._ivs
+        new_p._evs = self._evs
+        new_p._stat_stages = self._stat_stages.copy()
+        new_p._raw_stats = self._raw_stats.copy()
+        new_p._effective_stats = self._effective_stats.copy()
+
+        # Primitive state
+        new_p._max_hp = self._max_hp
+        new_p._current_hp = self._current_hp
+        new_p.is_alive = self.is_alive
+        new_p._status = self._status
+        new_p._confused = self._confused
+        new_p._confused_turns = self._confused_turns
+        new_p._taunted = self._taunted
+        new_p._taunted_turns = self._taunted_turns
+        new_p._accuracy = self._accuracy
+        new_p._accuracy_stage = self._accuracy_stage
+        new_p._sleep_turns = self._sleep_turns
+
+        # List comp for move slots
+        new_p.move_slots = [ms.copy() for ms in self.move_slots]
+
+        return new_p
 
     def can_attack(self) -> tuple[bool, list[Message]]:
+        msgs = []
+
+        # Optimistic check: if healthy and no volatile status, return immediately
+        if self._status == PokemonStatus.HEALTHY and not self._confused:
+            return True, msgs
+
+        # STATUS CHECKS
+        if self._status == PokemonStatus.FREEZE:
+            if random.random() < 0.2:
+                self._status = PokemonStatus.HEALTHY
+                msgs.append(Message(f"{self.surname} thawed out!"))
+            else:
+                return False, [Message(f"{self.surname} is frozen solid!")]
+
+        elif self._status == PokemonStatus.SLEEP:
+            if self._sleep_turns <= 0:
+                self._status = PokemonStatus.HEALTHY
+                msgs.append(Message(f"{self.surname} woke up!"))
+            else:
+                msgs.append(Message(f"{self.surname} is fast asleep."))
+                self._sleep_turns -= 1
+                return False, msgs
+
+        elif self._status == PokemonStatus.PARALYSIS:
+            if random.random() < 0.25:
+                return False, [Message(f"{self.surname} is paralyzed! It can't move!")]
+
+        # VOLATILE CHECKS
         if self._confused:
-            if self._confused_turns == 0:
-                self._confused_turns = random.randint(2, 4)
+            msgs.append(Message(f"{self.surname} is confused!"))
             self._confused_turns -= 1
-            if self._confused_turns == 0:
+            if self._confused_turns <= 0:
                 self._confused = False
-                return True, [Message(f"{self.surname} snapped out of confusion!")]
-            if random.choice([True, False]):
-                damage, critical, effectiveness = MoveAccessor.SelfHit.calculate_damage(
-                    self, self
-                )[0:3]
-                self.hp -= damage
-                return False, [
-                    Message(
-                        f"{self.surname} is confused! It hurt itself in its confusion!"
-                    )
-                ]
-        return True, []
+                msgs.append(Message(f"{self.surname} snapped out of confusion!"))
+            elif random.random() < 0.50:
+                atk = self.attack
+                defn = self.defense
+                dmg = int(((self._level_factor * 40 * atk // defn) // 50) + 2)
+                self.hp -= dmg
+                msgs.append(Message("It hurt itself in its confusion!"))
+                return False, msgs
+
+        return True, msgs
 
     def after_turn(self) -> list[Message]:
-        messages = []
-        if self.is_alive:
-            if self.status == PokemonStatus.Burn:
-                burn_damage = self.max_hp // 8
-                self.hp -= burn_damage
-                messages.extend(
-                    [
-                        Message(f"{self.surname} is hurt by its burn!"),
-                        Message(f"{self.name} lost {burn_damage} HP."),
-                    ]
-                )
-            if self._taunted:
-                # Implement taunt logic
-                pass
-        return messages
+        msgs = []
+        if not self.is_alive:
+            return msgs
+
+        # Use bitmask-like logic or direct checks
+        status = self._status
+
+        if status == PokemonStatus.BURN:
+            dmg = max(
+                1, self._max_hp >> 3
+            )  # Bitwise shift for division by 8 (Gen 1-6 style 1/8)
+            self.hp -= dmg
+            msgs.append(Message(f"{self.surname} is hurt by its burn!"))
+
+        elif status == PokemonStatus.POISON:
+            dmg = max(1, self._max_hp >> 3)
+            self.hp -= dmg
+            msgs.append(Message(f"{self.surname} is hurt by poison!"))
+
+        if self._taunted:
+            self._taunted_turns -= 1
+            if self._taunted_turns <= 0:
+                self._taunted = False
+                msgs.append(Message(f"{self.surname}'s taunt wore off!"))
+
+        return msgs
 
     def __repr__(self) -> str:
-        return f"Pokemon(id={self.pokemon_id}, name={self.name}, surname={self.surname}, level={self.level}, hp={self.hp}/{self.max_hp})"
+        return f"<{self.surname} ({self.species.name}) L{self.level} HP:{self.hp}/{self.max_hp}>"
 
-    def __str__(self) -> str:
-        return f"{self.surname} Lvl.{self.level} | HP: {self.hp}/{self.max_hp}"
-
-    def __hash__(self) -> int:
-        return hash(self.pokemon_id)
-
-    @property
-    def str_stats(self) -> str:
-        return f"{self.surname} Lvl.{self.level} | HP: {self.hp}/{self.max_hp} | ATK: {self.attack} | DEF: {self.defense} | SP.ATK: {self.sp_attack} | SP.DEF: {self.sp_defense} | SPD: {self.speed}"
-
-    @property
-    def str_moves(self) -> str:
-        text = f"{self.surname} has the following moves:"
-        text += "".join(
-            [
-                f"\n[{i + 1}] {move.name} | Type: {move.type} | PP: {self._pp[i]}/{move.pp}"
-                for i, move in enumerate(self.moves)
-            ]
+    def __eq__(self, other):
+        if not isinstance(other, Pokemon):
+            return NotImplemented
+        return (
+            self.species.id == other.species.id
+            and self.level == other.level
+            and self._current_hp == other._current_hp
+            and self._status == other._status
+            and self._stat_stages == other._stat_stages
+            and self._confused == other._confused
+            and self._confused_turns == other._confused_turns
+            and self._taunted == other._taunted
+            and self._taunted_turns == other._taunted_turns
+            and self._accuracy_stage == other._accuracy_stage
+            and self.move_slots == other.move_slots
         )
-        return text
 
-    def get_pp(self, move_name: str) -> int:
-        for i, move in enumerate(self.moves):
-            if move.name == move_name:
-                return self._pp[i]
-        if DEBUG:
-            raise PokemonError(f"Move {move_name} not found in moveset")
-
-    def decrease_pp(self, move_name: str):
-        for i, move in enumerate(self.moves):
-            if move.name == move_name:
-                if self._pp[i] > 0:
-                    self._pp[i] -= 1
-                else:
-                    if DEBUG:
-                        raise PokemonError(f"PP for move {move_name} is already 0")
-                return
-        if DEBUG:
-            raise PokemonError(f"Move {move_name} not found in moveset")
-
-    @property
-    def memory_size(self) -> int:
-        return asizeof.asizeof(self)
-
-    @property
-    def one_hot(self) -> torch.Tensor:
-        return ONEHOTCACHE.get_one_hot(len(POKEMON_LIST) + 1, self.pokemon_id + 1)
-
-    @cached_property
-    def one_hot_description(self) -> torch.Tensor:
-        return POKEMON_ONE_HOT_DESCRIPTION
+    def __hash__(self):
+        return hash(
+            (
+                self.species.id,
+                self.level,
+                self._current_hp,
+                self._status,
+                tuple(self._stat_stages),
+                self._confused,
+                self._confused_turns,
+                self._taunted,
+                self._taunted_turns,
+                self._accuracy_stage,
+                tuple(self.move_slots),
+            )
+        )
 
 
-@dataclass
-class Pikachu(Pokemon):
-    level: int = 5
-    pokemon_id: int = 0
-    name: str = "pikachu"
-    types: set = field(default_factory=lambda: [PokemonTypeAccessor.Electric])
-    base_hp: int = 35
-    base_attack: int = 55
-    base_defense: int = 40
-    base_sp_attack: int = 50
-    base_sp_defense: int = 50
-    base_speed: int = 90
-    moves: list[Move] = field(
-        default_factory=lambda: [
-            MoveAccessor.ThunderShock,
-            MoveAccessor.Growl,
-            MoveAccessor.QuickAttack,
-            MoveAccessor.TailWhip,
-        ]
-    )
-
-    __repr__ = Pokemon.__repr__
-    __str__ = Pokemon.__str__
-    __hash__ = Pokemon.__hash__
+# --- Registry System ---
 
 
-@dataclass
-class Chimchar(Pokemon):
-    level: int = 5
-    pokemon_id: int = 1
-    name: str = "chimchar"
-    types: set = field(default_factory=lambda: [PokemonTypeAccessor.Fire])
-    base_hp: int = 44
-    base_attack: int = 58
-    base_defense: int = 44
-    base_sp_attack: int = 58
-    base_sp_defense: int = 44
-    base_speed: int = 61
-    moves: list[Move] = field(
-        default_factory=lambda: [MoveAccessor.Scratch, MoveAccessor.Ember]
-    )
+class SpeciesRegistry:
+    _species: list[PokemonSpecies] = []
+    _map: dict[str, PokemonSpecies] = {}
 
-    __repr__ = Pokemon.__repr__
-    __str__ = Pokemon.__str__
-    __hash__ = Pokemon.__hash__
+    @classmethod
+    def register(
+        cls,
+        name: str,
+        types: tuple[PokemonType, ...],
+        hp: int,
+        atk: int,
+        Def: int,
+        spa: int,
+        spd: int,
+        spe: int,
+        moves: tuple[str, ...],
+    ) -> PokemonSpecies:
+        s_id = len(cls._species)
+        stats = (hp, atk, Def, spa, spd, spe)
+        species = PokemonSpecies(s_id, name, types, stats, moves)
+        cls._species.append(species)
+        cls._map[name.lower()] = species
+        return species
 
-
-@dataclass
-class Piplup(Pokemon):
-    level: int = 5
-    pokemon_id: int = 2
-    name: str = "piplup"
-    types: set = field(default_factory=lambda: [PokemonTypeAccessor.Water])
-    base_hp: int = 53
-    base_attack: int = 51
-    base_defense: int = 53
-    base_sp_attack: int = 61
-    base_sp_defense: int = 56
-    base_speed: int = 40
-    moves: list[Move] = field(
-        default_factory=lambda: [
-            MoveAccessor.Pound,
-            MoveAccessor.WaterGun,
-            MoveAccessor.Growl,
-        ]
-    )
-
-    __repr__ = Pokemon.__repr__
-    __str__ = Pokemon.__str__
-    __hash__ = Pokemon.__hash__
+    @classmethod
+    def get(cls, name_or_id: str | int) -> Optional[PokemonSpecies]:
+        if isinstance(name_or_id, int):
+            if 0 <= name_or_id < len(cls._species):
+                return cls._species[name_or_id]
+        else:
+            return cls._map.get(str(name_or_id).lower())
+        return None
 
 
-@dataclass
-class Bulbasaur(Pokemon):
-    level: int = 5
-    pokemon_id: int = 3
-    name: str = "bulbasaur"
-    types: set = field(default_factory=lambda: [PokemonTypeAccessor.Grass])
-    base_hp: int = 45
-    base_attack: int = 49
-    base_defense: int = 49
-    base_sp_attack: int = 65
-    base_sp_defense: int = 65
-    base_speed: int = 45
-    moves: list[Move] = field(
-        default_factory=lambda: [
-            MoveAccessor.Tackle,
-            MoveAccessor.Growl,
-            MoveAccessor.VineWhip,
-        ]
-    )
+# --- Registration ---
 
-    __repr__ = Pokemon.__repr__
-    __str__ = Pokemon.__str__
-    __hash__ = Pokemon.__hash__
-
-
-@dataclass
-class Charmander(Pokemon):
-    level: int = 5
-    pokemon_id: int = 4
-    name: str = "charmander"
-    types: set = field(default_factory=lambda: [PokemonTypeAccessor.Fire])
-    base_hp: int = 39
-    base_attack: int = 52
-    base_defense: int = 43
-    base_sp_attack: int = 60
-    base_sp_defense: int = 50
-    base_speed: int = 65
-    moves: list[Move] = field(
-        default_factory=lambda: [
-            MoveAccessor.Scratch,
-            MoveAccessor.Growl,
-            MoveAccessor.Ember,
-        ]
-    )
-
-    __repr__ = Pokemon.__repr__
-    __str__ = Pokemon.__str__
-    __hash__ = Pokemon.__hash__
-
-
-@dataclass
-class Squirtle(Pokemon):
-    level: int = 5
-    pokemon_id: int = 5
-    name: str = "squirtle"
-    types: set = field(default_factory=lambda: [PokemonTypeAccessor.Water])
-    base_hp: int = 44
-    base_attack: int = 48
-    base_defense: int = 65
-    base_sp_attack: int = 50
-    base_sp_defense: int = 64
-    base_speed: int = 43
-    moves: list[Move] = field(
-        default_factory=lambda: [
-            MoveAccessor.Tackle,
-            MoveAccessor.TailWhip,
-            MoveAccessor.WaterGun,
-        ]
-    )
-
-    __repr__ = Pokemon.__repr__
-    __str__ = Pokemon.__str__
-    __hash__ = Pokemon.__hash__
-
-
-@dataclass
-class Pidgey(Pokemon):
-    level: int = 5
-    pokemon_id: int = 6
-    name: str = "pidgey"
-    types: set = field(
-        default_factory=lambda: [PokemonTypeAccessor.Normal, PokemonTypeAccessor.Flying]
-    )
-    base_hp: int = 40
-    base_attack: int = 45
-    base_defense: int = 40
-    base_sp_attack: int = 35
-    base_sp_defense: int = 35
-    base_speed: int = 56
-    moves: list[Move] = field(
-        default_factory=lambda: [
-            MoveAccessor.Tackle,
-            MoveAccessor.SandAttack,
-            MoveAccessor.QuickAttack,
-        ]
-    )
-
-    __repr__ = Pokemon.__repr__
-    __str__ = Pokemon.__str__
-    __hash__ = Pokemon.__hash__
-
-
-@dataclass
-class Rattata(Pokemon):
-    level: int = 5
-    pokemon_id: int = 7
-    name: str = "rattata"
-    types: set = field(default_factory=lambda: [PokemonTypeAccessor.Normal])
-    base_hp: int = 30
-    base_attack: int = 56
-    base_defense: int = 35
-    base_sp_attack: int = 25
-    base_sp_defense: int = 35
-    base_speed: int = 72
-    moves: list[Move] = field(
-        default_factory=lambda: [
-            MoveAccessor.Tackle,
-            MoveAccessor.TailWhip,
-            MoveAccessor.QuickAttack,
-        ]
-    )
-
-    __repr__ = Pokemon.__repr__
-    __str__ = Pokemon.__str__
-    __hash__ = Pokemon.__hash__
-
-
-@dataclass
-class Sandshrew(Pokemon):
-    level: int = 5
-    pokemon_id: int = 8
-    name: str = "sandshrew"
-    types: set = field(default_factory=lambda: [PokemonTypeAccessor.Ground])
-    base_hp: int = 50
-    base_attack: int = 75
-    base_defense: int = 85
-    base_sp_attack: int = 20
-    base_sp_defense: int = 30
-    base_speed: int = 40
-    moves: list[Move] = field(
-        default_factory=lambda: [
-            MoveAccessor.Scratch,
-            MoveAccessor.SandAttack,
-        ]
-    )
-
-    __repr__ = Pokemon.__repr__
-    __str__ = Pokemon.__str__
-    __hash__ = Pokemon.__hash__
-
-
-@dataclass
-class Eevee(Pokemon):
-    level: int = 5
-    pokemon_id: int = 9
-    name: str = "eevee"
-    types: set = field(default_factory=lambda: [PokemonTypeAccessor.Normal])
-    base_hp: int = 55
-    base_attack: int = 55
-    base_defense: int = 50
-    base_sp_attack: int = 45
-    base_sp_defense: int = 65
-    base_speed: int = 55
-    moves: list[Move] = field(
-        default_factory=lambda: [
-            MoveAccessor.Tackle,
-            MoveAccessor.TailWhip,
-            MoveAccessor.SandAttack,
-        ]
-    )
-
-    __repr__ = Pokemon.__repr__
-    __str__ = Pokemon.__str__
-    __hash__ = Pokemon.__hash__
-
-
-POKEMON_LIST = [
-    Pikachu,
-    Chimchar,
-    Piplup,
-    Bulbasaur,
-    Charmander,
-    Squirtle,
-    Pidgey,
-    Rattata,
-    Sandshrew,
-    Eevee,
-]
-
-POKEMON_MAP = {pokemon.name: pokemon for pokemon in POKEMON_LIST}
-
-assert len({pokemon.pokemon_id for pokemon in POKEMON_LIST}) == len(POKEMON_LIST), (
-    "Duplicate Pokemon IDs"
+Pikachu = SpeciesRegistry.register(
+    "Pikachu",
+    (PokemonType.ELECTRIC,),
+    35,
+    55,
+    40,
+    50,
+    50,
+    90,
+    ("Thunder Shock", "Growl", "Quick Attack", "Tail Whip"),
 )
 
-assert all(pokemon.pokemon_id == index for index, pokemon in enumerate(POKEMON_LIST)), (
-    "Invalid Move IDs"
+Chimchar = SpeciesRegistry.register(
+    "Chimchar", (PokemonType.FIRE,), 44, 58, 44, 58, 44, 61, ("Scratch", "Ember")
 )
 
+Piplup = SpeciesRegistry.register(
+    "Piplup",
+    (PokemonType.WATER,),
+    53,
+    51,
+    53,
+    61,
+    56,
+    40,
+    ("Tackle", "Water Gun", "Growl"),
+)
 
-class _PokemonAccessor:
-    def __getattr__(self, attr: str) -> Pokemon:
-        t = POKEMON_MAP.get(attr.lower())
-        if t:
-            return t
-        raise AttributeError(f"No Pokemon named '{attr}'")
+Bulbasaur = SpeciesRegistry.register(
+    "Bulbasaur",
+    (PokemonType.GRASS, PokemonType.POISON),  # Corrected types
+    45,
+    49,
+    49,
+    65,
+    65,
+    45,
+    ("Tackle", "Growl", "Vine Whip"),
+)
 
-    def __iter__(self):
-        return iter(POKEMON_LIST)
+Charmander = SpeciesRegistry.register(
+    "Charmander",
+    (PokemonType.FIRE,),
+    39,
+    52,
+    43,
+    60,
+    50,
+    65,
+    ("Scratch", "Growl", "Ember"),
+)
 
-    def __len__(self):
-        return len(POKEMON_LIST)
+Squirtle = SpeciesRegistry.register(
+    "Squirtle",
+    (PokemonType.WATER,),
+    44,
+    48,
+    65,
+    50,
+    64,
+    43,
+    ("Tackle", "Tail Whip", "Water Gun"),
+)
 
-    def __repr__(self):
-        return "Pokemons(" + ", ".join(t.name.capitalize() for t in POKEMON_LIST) + ")"
+Pidgey = SpeciesRegistry.register(
+    "Pidgey",
+    (PokemonType.NORMAL, PokemonType.FLYING),
+    40,
+    45,
+    40,
+    35,
+    35,
+    56,
+    ("Tackle", "Sand Attack", "Quick Attack"),
+)
 
-    def by_id(self, pokemon_id: int) -> Pokemon:
-        return POKEMON_LIST[pokemon_id]
+Rattata = SpeciesRegistry.register(
+    "Rattata",
+    (PokemonType.NORMAL,),
+    30,
+    56,
+    35,
+    25,
+    35,
+    72,
+    ("Tackle", "Tail Whip", "Quick Attack"),
+)
 
-    def get(self, name: str) -> Pokemon | None:
-        return POKEMON_MAP.get(name)
+Sandshrew = SpeciesRegistry.register(
+    "Sandshrew",
+    (PokemonType.GROUND,),
+    50,
+    75,
+    85,
+    20,
+    30,
+    40,
+    ("Scratch", "Sand Attack"),
+)
 
-    @property
-    def names(self) -> list[str]:
-        return list(POKEMON_MAP.keys())
+Eevee = SpeciesRegistry.register(
+    "Eevee",
+    (PokemonType.NORMAL,),
+    55,
+    55,
+    50,
+    45,
+    65,
+    55,
+    ("Tackle", "Tail Whip", "Sand Attack"),
+)
+
+Charizard = SpeciesRegistry.register(
+    "Charizard",
+    (PokemonType.FIRE, PokemonType.FLYING),
+    78,
+    84,
+    78,
+    109,
+    85,
+    100,
+    ("Flamethrower", "Wing Attack", "Slash", "Growl"),
+)
+Blastoise = SpeciesRegistry.register(
+    "Blastoise",
+    (PokemonType.WATER,),
+    79,
+    83,
+    100,
+    85,
+    105,
+    78,
+    ("Hydro Pump", "Skull Bash", "Bite", "Tackle"),
+)
+Venosaur = SpeciesRegistry.register(
+    "Venosaur",
+    (PokemonType.GRASS, PokemonType.POISON),
+    80,
+    82,
+    83,
+    100,
+    100,
+    80,
+    ("Solar Beam", "Razor Leaf", "Tackle", "Growl"),
+)
+Snorlax = SpeciesRegistry.register(
+    "Snorlax",
+    (PokemonType.NORMAL,),
+    160,
+    110,
+    65,
+    65,
+    110,
+    30,
+    ("Body Slam", "Hyper Beam", "Pound", "Tackle"),
+)
+Lapras = SpeciesRegistry.register(
+    "Lapras",
+    (PokemonType.WATER, PokemonType.ICE),
+    130,
+    85,
+    80,
+    85,
+    95,
+    60,
+    ("Blizzard", "Body Slam", "Hydro Pump", "Growl"),
+)
+Pidgeot = SpeciesRegistry.register(
+    "Pidgeot",
+    (PokemonType.NORMAL, PokemonType.FLYING),
+    83,
+    80,
+    75,
+    70,
+    70,
+    101,
+    ("Wing Attack", "Sky Attack", "Tackle", "Sand Attack"),
+)
+Alakazam = SpeciesRegistry.register(
+    "Alakazam",
+    (PokemonType.PSYCHIC,),
+    55,
+    50,
+    45,
+    135,
+    95,
+    120,
+    ("Psychic", "Tackle", "Pound", "Growl"),
+)
+Rhydon = SpeciesRegistry.register(
+    "Rhydon",
+    (PokemonType.GROUND, PokemonType.ROCK),
+    105,
+    130,
+    120,
+    45,
+    45,
+    40,
+    ("Earthquake", "Rock Slide", "Pound", "Tail Whip"),
+)
+Gyarados = SpeciesRegistry.register(
+    "Gyarados",
+    (PokemonType.WATER, PokemonType.FLYING),
+    95,
+    125,
+    79,
+    60,
+    100,
+    81,
+    ("Hydro Pump", "Hyper Beam", "Dragon Rage", "Tackle"),
+)
+Arcanine = SpeciesRegistry.register(
+    "Arcanine",
+    (PokemonType.FIRE,),
+    90,
+    110,
+    80,
+    100,
+    80,
+    95,
+    ("Flamethrower", "Extreme Speed", "Bite", "Growl"),
+)
+Exeggutor = SpeciesRegistry.register(
+    "Exeggutor",
+    (PokemonType.GRASS, PokemonType.PSYCHIC),
+    95,
+    95,
+    85,
+    125,
+    65,
+    55,
+    ("Psychic", "Solar Beam", "Tackle", "Growl"),
+)
+
+# --- Accessor Helper ---
 
 
-PokemonAccessor = _PokemonAccessor()
+class _PokedexMeta(type):
+    def __getattr__(cls, name: str) -> PokemonSpecies:
+        s = SpeciesRegistry.get(name)
+        if s:
+            return s
+        raise AttributeError(f"Pokemon {name} not found")
 
 
-POKEMON_ONE_HOT_PADDING = torch.tensor([1] + [0] * len(POKEMON_LIST))
-
-POKEMON_ONE_HOT_DESCRIPTION = ["Pokemon Padding"] + [
-    pokemon.name.capitalize() for pokemon in PokemonAccessor
-]
+class Pokedex(metaclass=_PokedexMeta):
+    pass

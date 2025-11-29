@@ -1,87 +1,95 @@
-# tests/test_pokemon_type.py
-
 import pytest
 
-from pokemon.pokemon_type import PokemonType, PokemonTypeAccessor, PokemonTypeError
+from pokemon.pokemon_type import (
+    _EFFECTIVENESS_CHART,
+    _EFFECTIVENESS_CHART_3D,
+    PokemonType,
+)
 
 
-def test_type_accessor():
-    """Tests the PokemonTypeAccessor for retrieving types."""
-    assert PokemonTypeAccessor.Fire.name == "Fire"
-    assert PokemonTypeAccessor.by_id(1).name == "Normal"
-    assert len(list(PokemonTypeAccessor)) > 15  # Ensure types are loaded
-    with pytest.raises(AttributeError):
-        _ = PokemonTypeAccessor.NonExistentType
-
-
-def test_type_equality():
-    """Tests equality comparison between PokemonType instances."""
-    assert PokemonTypeAccessor.Grass == PokemonTypeAccessor.by_id(4)
-    assert PokemonTypeAccessor.Water != PokemonTypeAccessor.Ice
-
-
-def test_effectiveness_against_single_type():
-    """Tests the effectiveness calculation against a single target type."""
-    fire = PokemonTypeAccessor.Fire
-    water = PokemonTypeAccessor.Water
-    grass = PokemonTypeAccessor.Grass
-
-    # Super effective
-    assert water.effectiveness_against([fire]) == 2.0
-    # Not very effective
-    assert fire.effectiveness_against([water]) == 0.5
-    # Normal effectiveness
-    assert fire.effectiveness_against([grass]) == 2.0
-    # Immunity
-    ground = PokemonTypeAccessor.Ground
-    electric = PokemonTypeAccessor.Electric
-    assert electric.effectiveness_against([ground]) == 0.0
-
-
-def test_effectiveness_against_dual_type():
-    """Tests the effectiveness calculation against a dual-type target."""
-    rock = PokemonTypeAccessor.Rock
-    ground = PokemonTypeAccessor.Ground
-    water = (
-        PokemonTypeAccessor.Water
-    )  # Water is super effective against both Rock and Ground
-
-    # Dual weakness: Water vs Rock/Ground should be 4x
-    assert water.effectiveness_against([rock, ground]) == 4.0
-
-    electric = PokemonTypeAccessor.Electric
-    flying = PokemonTypeAccessor.Flying  # Flying is immune to Ground
-    # One immunity should result in 0x effectiveness
-    assert ground.effectiveness_against([electric, flying]) == 0.0
-
-    fire = PokemonTypeAccessor.Fire
-    # Resistance and weakness should cancel out (0.5 * 2.0 = 1.0)
-    # Grass is weak to Fire (2x) but resists Water (0.5x)
-    # Let's test Fire against Water/Grass
-    water_grass = [PokemonTypeAccessor.Water, PokemonTypeAccessor.Grass]
-    assert fire.effectiveness_against(water_grass) == 1.0  # 0.5 * 2.0
-
-
-def test_invalid_type_initialization():
-    """Tests that initializing a PokemonType with invalid data raises an error.
-    This requires the DEBUG flag to be set, which we assume is off during tests.
-    This test is designed to pass if no error is raised when DEBUG is off.
-    If DEBUG were on, we would assert that a PokemonTypeError is raised.
+@pytest.mark.parametrize(
+    "attacker, defender, expected",
+    [
+        (PokemonType.WATER, PokemonType.FIRE, 2.0),  # Weakness
+        (PokemonType.FIRE, PokemonType.WATER, 0.5),  # Resistance
+        (PokemonType.NORMAL, PokemonType.NORMAL, 1.0),  # Neutral
+        (PokemonType.GROUND, PokemonType.FLYING, 0.0),  # Immunity
+        (PokemonType.GHOST, PokemonType.NORMAL, 0.0),  # Immunity
+    ],
+)
+def test_single_type_effectiveness(attacker, defender, expected):
     """
-    try:
-        # This should raise PokemonTypeError if DEBUG is on
-        _ = PokemonType(name=123, type_id="abc")
-    except (PokemonTypeError, TypeError):
-        # Catching TypeError as well, as it might be raised without DEBUG validation
-        pass
+    Tests 1v1 interactions.
+    We pad the second defender type with NONETYPE to simulate a single-type Pokemon.
+    """
+    defenders = (defender, PokemonType.NONETYPE)
+    assert attacker.effectiveness_against(defenders) == expected
 
 
-# --- Performance Test ---
+@pytest.mark.parametrize(
+    "attacker, def_primary, def_secondary, expected",
+    [
+        # Quad Weakness (2.0 * 2.0)
+        (PokemonType.ICE, PokemonType.DRAGON, PokemonType.FLYING, 4.0),
+        # Neutralization (2.0 * 0.5)
+        # Ground hits Poison (2.0) but Bug resists Ground (0.5) in your config
+        (PokemonType.GROUND, PokemonType.POISON, PokemonType.BUG, 1.0),
+        # Immunity Override (0.0 * 2.0)
+        # Electric vs Ground (0.0) / Water (2.0) -> Immunity wins
+        (PokemonType.ELECTRIC, PokemonType.GROUND, PokemonType.WATER, 0.0),
+        # Quad Resistance (0.5 * 0.5)
+        # Grass vs Fire (0.5) / Flying (0.5) -> 0.25
+        (PokemonType.GRASS, PokemonType.FIRE, PokemonType.FLYING, 0.25),
+    ],
+)
+def test_dual_type_effectiveness(attacker, def_primary, def_secondary, expected):
+    """
+    Tests 1v2 interactions (Dual-type defenders).
+    """
+    defenders = (def_primary, def_secondary)
+    assert attacker.effectiveness_against(defenders) == expected
 
 
-def test_performance_effectiveness_against(benchmark):
-    """Performance test for the effectiveness_against method."""
-    water = PokemonTypeAccessor.Water
-    fire = PokemonTypeAccessor.Fire
-    flying = PokemonTypeAccessor.Flying
-    benchmark(water.effectiveness_against, [fire, flying])
+def test_order_independence():
+    """
+    Ensure that the order of the defender's types does not change the result.
+    (Fire/Flying should be the same as Flying/Fire).
+    """
+    attacker = PokemonType.ROCK
+    # Rock vs Fire (2.0) / Flying (2.0) -> 4.0
+
+    res1 = attacker.effectiveness_against((PokemonType.FIRE, PokemonType.FLYING))
+    res2 = attacker.effectiveness_against((PokemonType.FLYING, PokemonType.FIRE))
+
+    assert res1 == 4.0
+    assert res1 == res2
+
+
+def test_custom_config_logic():
+    """
+    Verifies a specific rule from your custom config:
+    Your config defines BUG as immune to PSYCHIC (Standard games are just resistance).
+    """
+    attacker = PokemonType.PSYCHIC
+    defender = PokemonType.BUG
+
+    assert attacker.effectiveness_against((defender, PokemonType.NONETYPE)) == 0.0
+
+
+def test_3d_matrix_integrity():
+    """
+    Mathematical proof: Ensures the 3D optimization matches
+    the result of performing the 2D multiplications manually.
+    """
+    for atk in PokemonType:
+        for d1 in PokemonType:
+            for d2 in PokemonType:
+                # Calculate manually using 2D lookup
+                val_1 = _EFFECTIVENESS_CHART[atk][d1]
+                val_2 = _EFFECTIVENESS_CHART[atk][d2]
+                expected = val_1 * val_2
+
+                # Retrieve from optimized 3D tensor
+                actual = _EFFECTIVENESS_CHART_3D[atk][d1][d2]
+
+                assert actual == expected

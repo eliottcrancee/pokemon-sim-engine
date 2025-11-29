@@ -1,15 +1,17 @@
-# message.py
-
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class Message:
-    message: str
+    """
+    Immutable container for game log messages.
+    Using slots=True for memory efficiency in large battle logs.
+    """
 
-    def __str__(self):
-        return self.message
+    text: str
 
-    @property
-    def content(self):
-        return self.message
+    def __str__(self) -> str:
+        return self.text
+
+    def __repr__(self) -> str:
+        return f"'{self.text}'"

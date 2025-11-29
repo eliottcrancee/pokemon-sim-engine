@@ -1,179 +1,282 @@
-import math
-import os
-import sys
 import time
+import timeit
 
 from tqdm import tqdm
-
-# Ensure src directory is in path
-sys.path.append(os.path.join(os.getcwd(), "src"))
 
 from pokemon.agents import (
     AlphaBetaAgent,
     BaseAgent,
     BestAttackAgent,
-    BestAttackAndPotionAgent,
-    EvaluatingAgent,
-    FirstAgent,
     InputAgent,
     MinimaxAgent,
-    OneStepAlphaBetaAgent,
-    OneStepMinimaxAgent,
-    OneStepUniformExpectimaxAgent,
     RandomAgent,
-    RandomAttackAgent,
-    RandomAttackAndPotionAgent,
-    ThreeStepAlphaBetaAgent,
-    TwoStepAlphaBetaAgent,
-    TwoStepMinimaxAgent,
+    SmarterHeuristicAgent,
 )
 from pokemon.battle import Battle
-from pokemon.item import ItemAccessor
+from pokemon.battle_registry import BattleRegistry
 from pokemon.play import play_multiple, play_tournament
-from pokemon.pokemon import PokemonAccessor
-from pokemon.trainer import Trainer
 from pokemon.ui import play_ui
 
+AGENT_POOL = {
+    "RandomAgent": lambda: RandomAgent(),
+    "BestAttackAgent": lambda: BestAttackAgent(),
+    "SmarterHeuristicAgent": lambda: SmarterHeuristicAgent(),
+    "MinimaxAgent (d=1)": lambda: MinimaxAgent(depth=1),
+    "AlphaBetaAgent (d=2)": lambda: AlphaBetaAgent(depth=2),
+}
 
-def create_trainer(name):
-    return Trainer(
-        name=name,
-        pokemon_team=[
-            PokemonAccessor.Pikachu(level=12),
-            PokemonAccessor.Charmander(level=12),
-            PokemonAccessor.Squirtle(level=12),
-        ],
-        inventory={
-            ItemAccessor.Potion.name: ItemAccessor.Potion(default_quantity=1),
-            ItemAccessor.SuperPotion.name: ItemAccessor.SuperPotion(default_quantity=1),
-        },
+
+def select_from_list(prompt: str, options: list[str]) -> str:
+    """Generic helper to select an item from a list by its index."""
+    print(prompt)
+    for i, option in enumerate(options, 1):
+        print(f"  [{i}] {option}")
+    while True:
+        try:
+            choice = int(input("> "))
+            if 1 <= choice <= len(options):
+                return options[choice - 1]
+            else:
+                print("Invalid choice. Please try again.")
+        except ValueError:
+            print("Please enter a number.")
+
+
+def select_agent(prompt: str) -> "BaseAgent":
+    """Lets the user select an agent from the AGENT_POOL."""
+    agent_name = select_from_list(prompt, list(AGENT_POOL.keys()))
+    return AGENT_POOL[agent_name]()
+
+
+def get_battle_description(battle: "Battle") -> str:
+    """Creates a descriptive string for a battle."""
+    t1 = battle.trainers[0]
+    t2 = battle.trainers[1]
+
+    t1_team = ", ".join([f"{p.name} (L{p.level})" for p in t1.pokemon_team])
+    t2_team = ", ".join([f"{p.name} (L{p.level})" for p in t2.pokemon_team])
+
+    return f"{t1.name} [{t1_team}] vs. {t2.name} [{t2_team}]"
+
+
+def select_battle_verbose() -> tuple[str, "Battle"]:
+    """
+    Lets the user select a battle, displaying verbose descriptions.
+    Returns the name of the battle and the Battle object.
+    """
+    battle_names = BattleRegistry.list_battles()
+    descriptions = [
+        get_battle_description(BattleRegistry.get(name)) for name in battle_names
+    ]
+
+    print("\nChoose a battle scenario:")
+    for i, name in enumerate(battle_names, 1):
+        print(f"  [{i}] {name}: {descriptions[i - 1]}")
+
+    while True:
+        try:
+            choice = int(input("> "))
+            if 1 <= choice <= len(battle_names):
+                selected_name = battle_names[choice - 1]
+                return selected_name, BattleRegistry.get(selected_name)
+            else:
+                print("Invalid choice. Please try again.")
+        except ValueError:
+            print("Please enter a number.")
+
+
+def run_ui_mode():
+    """Play an interactive game against an AI."""
+    print("\n--- UI Mode ---")
+    opponent = select_agent("Choose your opponent:")
+    battle_name, battle = select_battle_verbose()
+    player = InputAgent()
+
+    print(f"\nStarting UI battle: You vs. {opponent.name} in '{battle_name}'")
+    print("Loading...")
+    time.sleep(1)
+
+    play_ui(battle, player, opponent)
+
+
+def run_agent_vs_agent_mode():
+    """Run a simulation between two agents."""
+    print("\n--- Agent vs. Agent Mode ---")
+    agent1 = select_agent("Choose Agent 1:")
+    agent2 = select_agent("Choose Agent 2:")
+    battle_name, battle = select_battle_verbose()
+
+    while True:
+        try:
+            n_battles = int(input("Enter number of battles to simulate: "))
+            if n_battles > 0:
+                break
+            else:
+                print("Please enter a positive number.")
+        except ValueError:
+            print("Please enter a valid number.")
+
+    print(
+        f"\nRunning {n_battles} battles for '{battle_name}' between '{agent1.name}' and '{agent2.name}'..."
     )
 
-
-def run_ui():
-    ash = create_trainer("Ash")
-    gary = create_trainer("Gary")
-    battle = Battle(trainer_0=ash, trainer_1=gary, max_rounds=100)
-
-    input_agent = InputAgent()
-    opponent_agent = AlphaBetaAgent(depth=5, parallelize=True)
-    play_ui(battle, input_agent, opponent_agent)
-
-
-def run_versus():
-    n_battles = 32
-
-    ash = create_trainer("Ash")
-    gary = create_trainer("Gary")
-    battle = Battle(trainer_0=ash, trainer_1=gary, max_rounds=100)
-
-    agent_0 = AlphaBetaAgent(depth=2)
-    agent_1 = AlphaBetaAgent(depth=4)
-
-    agent_0_wins, draws, agent_1_wins = play_multiple(
-        battle,
-        agent_0,
-        agent_1,
+    wins1, draws, wins2 = play_multiple(
+        battle=battle,
+        agent_0=agent1,
+        agent_1=agent2,
         n_battles=n_battles,
         n_jobs=-1,
         verbose=True,
     )
 
-    print("\n--- Versus Results ---")
-    max_name_len = max(len(agent_0.name), len(agent_1.name))
-    print(
-        f"{agent_0.name:<{max_name_len}} : Wins = {agent_0_wins}, WinRate = {agent_0_wins / n_battles:.4f}"
-    )
-    print(
-        f"{agent_1.name:<{max_name_len}} : Wins = {agent_1_wins}, WinRate = {agent_1_wins / n_battles:.4f}"
-    )
-    print(f"Draws : {draws}")
+    print("\n--- Simulation Results ---")
+    print(f"{agent1.name} Wins: {wins1} ({wins1 / n_battles:.1%})")
+    print(f"{agent2.name} Wins: {wins2} ({wins2 / n_battles:.1%})")
+    print(f"Draws: {draws} ({draws / n_battles:.1%})")
+    print("--------------------------")
 
 
-def run_test_performance():
-    ash = create_trainer("Ash")
-    gary = create_trainer("Gary")
-    battle = Battle(trainer_0=ash, trainer_1=gary, max_rounds=100)
+def run_tournament_mode():
+    """Run a tournament with a pool of agents."""
+    print("\n--- Tournament Mode ---")
+    battle_name, battle = select_battle_verbose()
 
-    agent = AlphaBetaAgent(depth=4, parallelize=False)
+    while True:
+        try:
+            n_matches = int(input("Enter total number of matches to run: "))
+            n_battles_per_match = int(input("Enter battles per match: "))
+            if n_matches > 0 and n_battles_per_match > 0:
+                break
+            else:
+                print("Please enter positive numbers.")
+        except ValueError:
+            print("Please enter valid numbers.")
 
-    start = time.perf_counter()
+    print(f"\nStarting tournament for '{battle_name}'...")
+    agent_pool = [factory() for factory in AGENT_POOL.values()]
 
-    n_calls = 10
-    for _ in tqdm(range(n_calls), desc="Testing performance of get_action"):
-        agent.get_action(battle, 1)
-    end = time.perf_counter()
-    print(f"Average time per get_action call: {(end - start) / n_calls:.6f} seconds")
-
-
-def run_tournament():
-    print("\n--- Starting Glicko-2 Tournament ---")
-
-    ash = create_trainer("Ash")
-    gary = create_trainer("Gary")
-    battle = Battle(trainer_0=ash, trainer_1=gary, max_rounds=100)
-
-    n_matches = 256
-    n_battles_per_match = 16
-
-    agent_pool: list[BaseAgent] = [
-        FirstAgent(),
-        RandomAgent(),
-        RandomAttackAgent(),
-        BestAttackAgent(),
-        RandomAttackAndPotionAgent(heal_threshold=0.2),
-        BestAttackAndPotionAgent(heal_threshold=0.2),
-        RandomAttackAndPotionAgent(heal_threshold=0.33),
-        BestAttackAndPotionAgent(heal_threshold=0.33),
-        OneStepUniformExpectimaxAgent(),
-        MinimaxAgent(depth=1),
-        AlphaBetaAgent(depth=1),
-        AlphaBetaAgent(depth=2),
-        AlphaBetaAgent(depth=3),
-        AlphaBetaAgent(depth=4),
-        AlphaBetaAgent(depth=5),
-    ]
-
-    play_tournament(
+    final_rankings = play_tournament(
         agent_pool=agent_pool,
         battle=battle,
         n_matches=n_matches,
         n_battles_per_match=n_battles_per_match,
     )
 
-    agent_pool.sort(key=lambda a: a.rating, reverse=True)
-    best_agent = agent_pool[0]
+    max_name_length = max(len(agent.name) for agent in final_rankings)
 
-    print("\n--- Agent Glicko-2 Ratings ---")
-    max_name_len = max(len(agent.name) for agent in agent_pool)
-    for agent in agent_pool:
-        agent: BaseAgent
-        mu = (agent.rating - 1500) / 173.7178
-        mu_j = (best_agent.rating - 1500) / 173.7178
-        phi_j = best_agent.rating_deviation / 173.7178
-        g_phi_j = 1 / math.sqrt(1 + 3 * phi_j**2 / math.pi**2)
-        win_prob = 1 / (1 + math.exp(-g_phi_j * (mu - mu_j)))
-
+    print("\n--- Final Tournament Rankings ---")
+    print(f"{'Rank':<5} {'Agent':<{max_name_length}} {'Rating':<10} {'Deviation':<10}")
+    print("-" * (5 + max_name_length + 10 + 10 + 3))
+    for i, agent in enumerate(final_rankings, 1):
         print(
-            f"{agent.name:<{max_name_len}} : Rating = {agent.rating:7.2f}, RD = {agent.rating_deviation:6.2f}, WinProb vs Best = {win_prob:.4f}"
+            f"{i:<5} {agent.name:<{max_name_length}} {agent.rating:<10.2f} {agent.rating_deviation:<10.2f}"
         )
+    print("-" * (5 + max_name_length + 10 + 10 + 3))
+
+
+def _perform_agent_action(agent, battle_template):
+    """Helper function to be timed by timeit."""
+    battle_instance = battle_template.copy()
+    _ = agent.get_action(battle_instance, 0)
+
+
+def run_performance_test_mode():
+    """Test the performance (execution time) of an agent's get_action method."""
+    print("\n--- Agent Performance Test Mode ---")
+
+    agent_instance = select_agent("Select agent to test performance:")
+    battle_name, battle_template = select_battle_verbose()
+
+    if battle_template is None:
+        print("Invalid battle selected. Returning to main menu.")
+        return
+
+    while True:
+        try:
+            num_repetitions = int(
+                input("Enter number of repetitions for timeit (e.g., 100): ")
+            )
+            if num_repetitions > 0:
+                break
+            else:
+                print("Please enter a positive number.")
+        except ValueError:
+            print("Please enter a valid number.")
+
+    print(
+        f"\nMeasuring performance of '{agent_instance.name}' on '{battle_name}' for {num_repetitions} repetitions..."
+    )
+
+    timer = timeit.Timer(lambda: _perform_agent_action(agent_instance, battle_template))
+
+    try:
+        times = []
+        for _ in tqdm(range(num_repetitions), desc="Running Performance Test"):
+            times.append(timer.timeit(number=1))
+
+        min_time = min(times)
+        max_time = max(times)
+        avg_time = sum(times) / len(times)
+        std_dev = (
+            (sum((x - avg_time) ** 2 for x in times) / len(times)) ** 0.5
+            if len(times) > 1
+            else 0.0
+        )
+
+        print("\n--- Performance Results ---")
+        print(f"Agent: {agent_instance.name}")
+        print(f"Battle: {battle_name}")
+        print(f"Number of individual calls measured: {num_repetitions}")
+        print(f"Min time per call: {min_time:.6f} seconds")
+        print(f"Max time per call: {max_time:.6f} seconds")
+        print(f"Average time per call: {avg_time:.6f} seconds")
+        print(f"Standard deviation: {std_dev:.6f} seconds")
+        print("---------------------------")
+
+    except Exception as e:
+        print(f"\nAn error occurred during performance testing: {e}")
+        print(
+            "Please ensure the selected agent and battle are compatible and have valid actions."
+        )
+        import traceback
+
+        traceback.print_exc()
+
+
+def main():
+    """
+    Main interactive menu for the Pokémon Playground.
+    """
+    while True:
+        print("\nWelcome to the Pokémon Playground!")
+        print("What would you like to do?")
+        print("  [1] Play an interactive game (UI Mode)")
+        print("  [2] Simulate Agent vs. Agent")
+        print("  [3] Run a Tournament")
+        print("  [4] Test Agent Performance (Timeit)")
+        print("  [5] Exit")
+
+        try:
+            choice = input("> ")
+            if choice == "1":
+                run_ui_mode()
+            elif choice == "2":
+                run_agent_vs_agent_mode()
+            elif choice == "3":
+                run_tournament_mode()
+            elif choice == "4":
+                run_performance_test_mode()
+            elif choice == "5":
+                print("Exiting playground. Goodbye!")
+                break
+            else:
+                print("Invalid choice. Please enter a number from 1 to 5.")
+        except Exception as e:
+            print(f"\nAn error occurred: {e}")
+            print("Returning to the main menu.")
+
+        input("\nPress Enter to return to the main menu...")
 
 
 if __name__ == "__main__":
-    run_ui()
-
-
-# --- Agent Glicko-2 Ratings ---
-# AlphaBeta(depth=3)                         : Rating = 2014.63, RD =  84.40, WinProb vs Best = 0.5000
-# AlphaBeta(depth=2)                         : Rating = 1932.15, RD =  88.42, WinProb vs Best = 0.3873
-# AlphaBeta(depth=1)                         : Rating = 1881.63, RD =  84.32, WinProb vs Best = 0.3231
-# Minimax(depth=1)                           : Rating = 1812.27, RD =  82.03, WinProb vs Best = 0.2450
-# OneStepUniformExpectimax                   : Rating = 1716.56, RD =  77.43, WinProb vs Best = 0.1601
-# BestAttackAndPotion(heal_threshold=0.2)    : Rating = 1602.72, RD =  67.93, WinProb vs Best = 0.0919
-# BestAttackAndPotion(heal_threshold=0.33)   : Rating = 1489.39, RD =  72.10, WinProb vs Best = 0.0511
-# RandomAttackAndPotion(heal_threshold=0.2)  : Rating = 1430.54, RD =  80.08, WinProb vs Best = 0.0374
-# RandomAttackAndPotion(heal_threshold=0.33) : Rating = 1346.12, RD =  82.86, WinProb vs Best = 0.0237
-# BestAttack                                 : Rating = 1284.17, RD =  82.39, WinProb vs Best = 0.0169
-# First                                      : Rating = 1234.17, RD =  85.02, WinProb vs Best = 0.0129
-# RandomAttack                               : Rating = 1011.08, RD =  90.79, WinProb vs Best = 0.0038
-# Random                                     : Rating =  935.95, RD = 104.38, WinProb vs Best = 0.0025
+    main()

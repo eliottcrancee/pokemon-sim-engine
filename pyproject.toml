@@ -18,21 +18,12 @@ classifiers = [
 ]
 dependencies = [
   "colorama>=0.4.6",
-  "line-profiler>=5.0.0",
-  "numpy>=2.3.4",
-  "pympler>=1.1",
-  "tabulate>=0.9.0",
+  "numpy>=2.3.5",
   "tqdm>=4.67.1",
-  "torch",
-  "torchvision",
-  "markupsafe>=3.0.3",
-  "matplotlib>=3.10.7",
-  "trueskill>=0.4.5",
   "loguru>=0.7.3",
-  "ruff>=0.14.4",
   "joblib>=1.5.2",
   "numba>=0.62.1",
-  "scipy>=1.16.3",
+  "readchar>=4.2.1",
 ]
 
 [project.urls]
@@ -41,7 +32,14 @@ Repository = "https://github.com/eliottcrancee/pokemon-sim-engine"
 Issues = "https://github.com/eliottcrancee/pokemon-sim-engine/issues"
 
 [project.optional-dependencies]
-dev = ["pytest>=8.3.2", "pytest-benchmark>=4.0.0"]
+dev = [
+  "matplotlib>=3.10.7",
+  "pympler>=1.1",
+  "pytest>=9.0.1",
+  "pytest-benchmark>=4.0.0",
+  "seaborn>=0.13.2",
+  "snakeviz>=2.2.2",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -49,15 +47,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pokemon"]
-
-[tool.uv.sources]
-torch = { index = "pytorch-cu129" }
-torchvision = { index = "pytorch-cu129" }
-
-[[tool.uv.index]]
-name = "pytorch-cu129"
-url = "https://download.pytorch.org/whl/cu129"
-explicit = true
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

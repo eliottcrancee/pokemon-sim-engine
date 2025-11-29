@@ -1,126 +1,230 @@
-# tests/test_move.py
+import random
+from unittest.mock import patch
 
 import pytest
 
 from pokemon.move import (
-    MOVE_LIST,
-    Move,
-    MoveAccessor,
     MoveCategory,
-    PokemonTypeAccessor,
-    Struggle,
+    MoveError,
+    MoveRegistry,
+    Moves,
+    RecoilMove,
+    _calculate_base_damage,
 )
-from pokemon.pokemon import PokemonAccessor
+from pokemon.pokemon import Pokedex, Pokemon, PokemonStatus
+from pokemon.pokemon_type import PokemonType
 
 
 @pytest.fixture
-def pokemon_instances():
-    """Fixture to provide fresh Pokemon instances for each test."""
-    return (
-        PokemonAccessor.Pikachu(level=10),
-        PokemonAccessor.Chimchar(level=15),
-        PokemonAccessor.Piplup(level=20),
-    )
+def charmander():
+    """Creates a Fire type Pokemon (Balanced)."""
+    p = Pokemon(species=Pokedex.Charmander, level=10)
+    return p
 
 
-def test_move_creation_and_representation():
-    """Tests basic move attributes and string representation."""
-    tackle = MoveAccessor.Tackle
-    assert tackle.name == "Tackle"
-    assert tackle.category == MoveCategory.Physical
-    assert tackle.type == PokemonTypeAccessor.Normal
-    assert str(tackle) == "Tackle | Type: Normal | PP: 35/35"
-    assert "Move(id=2, name=Tackle" in repr(tackle)
+@pytest.fixture
+def squirtle():
+    """Creates a Water type Pokemon (High Defense)."""
+    p = Pokemon(species=Pokedex.Squirtle, level=10)
+    return p
 
 
-def test_damage_calculation(pokemon_instances):
-    """Tests the damage calculation for a move.
-    Since damage has a random factor, we check if it's within an expected range.
+@pytest.fixture
+def rattata():
+    """Creates a Normal type Pokemon (Physical)."""
+    p = Pokemon(species=Pokedex.Rattata, level=10)
+    return p
+
+
+def test_physical_damage_calculation(rattata: Pokemon, squirtle: Pokemon):
     """
-    pikachu, chimchar = pokemon_instances[0], pokemon_instances[1]
-    move = MoveAccessor.ThunderShock  # Electric move
+    Test that a physical move uses Attack and Defense stats.
+    Rattata (Normal) uses Tackle (Physical).
+    """
+    move = Moves.Tackle
+    assert move.category == MoveCategory.PHYSICAL
 
-    # Pikachu (Electric) vs Chimchar (Fire) -> effectiveness = 1.0
-    damage, base_damage, critical, stab, effectiveness = move.calculate_damage(
-        pikachu, chimchar
+    # We use a fixed seed to ensure deterministic calculations
+    # (since the formula involves random variance)
+    random.seed(42)
+
+    damage, base_info, is_crit, stab, effectiveness = move.calculate_damage(
+        rattata, squirtle
     )
 
-    assert effectiveness == 1.0
-    assert stab is True  # Pikachu is Electric, ThunderShock is Electric
-    if damage > 0:
-        assert base_damage > 0
     assert isinstance(damage, int)
-    assert isinstance(critical, bool)
+    assert damage > 0
+    assert effectiveness == 1.0
+    assert stab is True
 
 
-def test_status_move_no_damage(pokemon_instances):
-    """Tests that status moves deal no damage."""
-    # We need a status move to test this. Let's create one for the test.
-    status_move = Move(
-        99,
-        "Test Status",
-        MoveCategory.Status,
-        PokemonTypeAccessor.Normal,
-        0,
+def test_type_effectiveness_super_effective(squirtle: Pokemon, charmander: Pokemon):
+    """
+    Test Super Effective damage (Water -> Fire).
+    """
+    move = Moves.WaterGun  # Water type
+
+    _, _, _, _, effectiveness = move.calculate_damage(squirtle, charmander)
+
+    assert effectiveness == 2.0  # Water is super effective against Fire
+
+
+def test_type_effectiveness_not_effective(charmander: Pokemon, squirtle: Pokemon):
+    """
+    Test Not Very Effective damage (Fire -> Water).
+    """
+    move = Moves.Ember  # Fire type
+
+    _, _, _, _, effectiveness = move.calculate_damage(charmander, squirtle)
+
+    assert effectiveness == 0.5  # Fire is not very effective against Water
+
+
+def test_status_move_debuff(rattata: Pokemon, squirtle: Pokemon):
+    """
+    Test that a Status move (Tail Whip) modifies the target's stats.
+    """
+    move = Moves.TailWhip
+
+    # Pre-condition
+    assert squirtle.modifiers[1] == 0 # Defense is index 1
+
+    # Simulate application (Move.secondary_effect)
+    msgs = move.secondary_effect(rattata, squirtle, 0, 0, False, False, 1.0)
+
+    # Post-condition: Defense should be -1
+    assert squirtle.modifiers[1] == -1
+    assert "fell" in msgs[0].text
+
+
+def test_status_move_self_buff(charmander: Pokemon):
+    """
+    Test that a self-targeting Status move (Agility) modifies the user's stats.
+    """
+    move = Moves.Agility
+
+    # Agility raises speed by 2 stages for the user
+    msgs = move.secondary_effect(charmander, charmander, 0, 0, False, False, 1.0)
+
+    assert charmander.modifiers[4] == 2 # Speed is index 4
+    assert "sharply rose" in msgs[0].text
+
+
+def test_ember_secondary_effect(charmander: Pokemon, rattata: Pokemon):
+    """
+    Test that Ember applies the BURN status (10% chance).
+    We use a mock to force the 10% chance to trigger success.
+    """
+    move = Moves.Ember
+
+    # Ensure Rattata is fresh
+    rattata.hp = rattata.max_hp
+    rattata.status = PokemonStatus.HEALTHY
+
+    # We simulate a hit that deals 5 damage.
+    # Since Rattata is Level 10, it has > 5 HP, so it won't die.
+    damage_dealt = 5
+
+    # Simulate the HP loss that occurs before the secondary effect check
+    rattata.hp -= damage_dealt
+
+    # We mock random.random to return 0.05.
+    # Since 0.05 < 0.10, the 10% chance requirement is met.
+    with patch("random.random", return_value=0.05):
+        msgs = move.secondary_effect(
+            charmander,
+            rattata,
+            damage_dealt=damage_dealt,
+            base_damage=damage_dealt,
+            critical=False,
+            stab=True,
+            effectiveness=1.0,
+        )
+
+    # Assertions
+    assert rattata.hp > 0, "Rattata should be alive"
+    assert rattata.status == PokemonStatus.BURN, "Status should be updated to BURN"
+    assert "burn" in msgs[0].text
+
+
+def test_struggle_recoil_mechanic(charmander: Pokemon, squirtle: Pokemon):
+    """
+    Test Struggle specific recoil: user loses 1/4 of Max HP.
+    """
+    move = Moves.Struggle
+    initial_hp = charmander.hp
+    max_hp = charmander.max_hp
+
+    # Execute secondary effect
+    msgs = move.secondary_effect(charmander, squirtle, 10, 10, False, False, 1.0)
+
+    expected_loss = max(1, max_hp // 4)
+    assert charmander.hp == initial_hp - expected_loss
+    assert "recoil" in msgs[0].text
+
+
+def test_standard_recoil_move(charmander, squirtle):
+    """
+    Test generic RecoilMove logic (e.g. user takes % of damage dealt).
+    Creating a custom move instance since standard registry moves might change.
+    """
+    recoil_move = RecoilMove(
+        "TestTakedown",
+        MoveCategory.PHYSICAL,
+        PokemonType.NORMAL,
+        90,
         100,
         20,
+        recoil_ratio=0.5,
     )
-    user, target, _ = pokemon_instances
-    damage, _, _, _, _ = status_move.calculate_damage(user, target)
-    assert damage == 0
+
+    damage_dealt = 50
+    initial_hp = charmander.hp
+
+    # Apply recoil
+    msgs = recoil_move.secondary_effect(
+        charmander, squirtle, damage_dealt, damage_dealt, False, False, 1.0
+    )
+
+    # Should lose 50% of 50 = 25 HP
+    assert charmander.hp == initial_hp - 25
+    assert "recoil" in msgs[0].text
 
 
-def test_struggle_move_effect(pokemon_instances):
-    """Tests the Struggle move's recoil effect."""
-    pikachu, chimchar = pokemon_instances[0], pokemon_instances[1]
-    initial_hp = pikachu.hp
-    struggle = Struggle
-
-    damage, *rest = struggle.calculate_damage(pikachu, chimchar)
-    messages = struggle.secondary_effect(pikachu, chimchar, damage, *rest)
-
-    assert "lost" in messages[0].content
-    assert pikachu.hp < initial_hp
-    assert pikachu.hp == initial_hp - (pikachu.max_hp // 4)
-
-
-def test_move_accuracy(pokemon_instances, capsys):
-    """Tests the accuracy of moves.
-    This is probabilistic, so we check if the hit rate is close to the accuracy.
+def test_registry_access_and_errors():
     """
-    pikachu, chimchar = pokemon_instances[0], pokemon_instances[1]
-    move = MoveAccessor.Tackle  # 95 accuracy
-    hit_count = sum(
-        1 for _ in range(1000) if move.calculate_damage(pikachu, chimchar)[0] > 0
+    Test that the registry works correctly via dot notation and string lookup.
+    """
+    # 1. Accessor
+    assert Moves.Tackle.name == "Tackle"
+
+    # 2. String lookup (Case insensitive)
+    assert MoveRegistry.get("flamethrower").name == "Flamethrower"
+
+    # 3. Invalid Access
+    with pytest.raises(AttributeError):
+        _ = Moves.NonExistentMove
+
+    with pytest.raises(MoveError):
+        # Registering a duplicate name
+        MoveRegistry.register(
+            RecoilMove("Tackle", MoveCategory.PHYSICAL, PokemonType.NORMAL, 1, 1, 1)
+        )
+
+
+def test_calculation_miss_logic():
+    """
+    Test that damage is 0 if the move misses.
+    """
+    # We force accuracy failure by passing accuracy=0 to the internal calculator
+    damage, _, _, _, _ = _calculate_base_damage(
+        power=100,
+        atk=50,
+        defi=50,
+        level_factor=1.0,
+        effectiveness=1.0,
+        stab=False,
+        accuracy=0,  # Impossible to hit
+        acc_stage=0,
     )
-    hit_rate = hit_count / 1000.0
-    # Check if hit rate is within a reasonable margin of the expected accuracy
-    assert move.accuracy / 100.0 - 0.1 < hit_rate < move.accuracy / 100.0 + 0.1
-
-    # The original test printed a table, we can skip that in a unit test
-    # or capture output if we want to verify the print format.
-
-
-def test_move_one_hot():
-    """Tests the one-hot encoding for a move."""
-    move = MoveAccessor.Scratch
-    one_hot = move.one_hot
-    assert one_hot.to_dense()[move.move_id] == 1
-    assert one_hot.to_dense().sum() == 1
-    assert len(one_hot.to_dense()) == len(MOVE_LIST)
-
-
-# --- Performance Tests ---
-
-
-def test_performance_calculate_damage(benchmark, pokemon_instances):
-    """Performance test for the calculate_damage method."""
-    pikachu, chimchar = pokemon_instances[0], pokemon_instances[1]
-    move = MoveAccessor.SelfHit
-    benchmark(move.calculate_damage, pikachu, chimchar)
-
-
-def test_performance_one_hot(benchmark):
-    """Performance test for the one_hot property."""
-    move = MoveAccessor.SelfHit
-    benchmark(lambda: move.one_hot)
+    assert damage == 0

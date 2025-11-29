@@ -1,262 +1,178 @@
 # trainer.py
 
-from dataclasses import dataclass, field
-from functools import cached_property
+from __future__ import annotations
 
-import torch
-from pympler import asizeof
-
-from pokemon.config import (
-    DEBUG,
-    MAX_ITEM_QUANTITY,
-    MAX_ITEMS_PER_TRAINER,
-    MAX_POKEMON_PER_TRAINER,
-)
-from pokemon.item import Item, ItemAccessor
-from pokemon.pokemon import (
-    POKEMON_ONE_HOT_DESCRIPTION,
-    POKEMON_ONE_HOT_PADDING,
-    POKEMON_STATUS_ONE_HOT_DESCRIPTION,
-    POKEMON_STATUS_ONE_HOT_PADDING,
-    Pokemon,
-)
-
-MAX_MOVES = 4
-
-POKEMON_PADDING_CACHE = {
-    i: torch.cat([POKEMON_ONE_HOT_PADDING] * (MAX_POKEMON_PER_TRAINER - i))
-    for i in range(MAX_POKEMON_PER_TRAINER)
-}
-POKEMON_PADDING_CACHE[MAX_POKEMON_PER_TRAINER] = torch.tensor([])
-
-POKEMON_STATUS_PADDING_CACHE = {
-    i: torch.cat([POKEMON_STATUS_ONE_HOT_PADDING] * (MAX_POKEMON_PER_TRAINER - i))
-    for i in range(MAX_POKEMON_PER_TRAINER)
-}
-POKEMON_STATUS_PADDING_CACHE[MAX_POKEMON_PER_TRAINER] = torch.tensor([])
-
-POKEMON_ZERROS_PADDING_CACHE = {
-    i: torch.cat([torch.tensor([0.0])] * (MAX_POKEMON_PER_TRAINER - i))
-    for i in range(MAX_POKEMON_PER_TRAINER)
-}
-POKEMON_ZERROS_PADDING_CACHE[MAX_POKEMON_PER_TRAINER] = torch.tensor([])
-
-ZEROS_TENSOR_CACHE = {
-    i: torch.zeros(i)
-    for i in range(MAX_POKEMON_PER_TRAINER + MAX_ITEMS_PER_TRAINER + 30)
-}
-
-EMPTY_ITEM = ItemAccessor.Potion(0)
+from pokemon.item import Item, ItemRegistry
+from pokemon.pokemon import Pokemon
 
 
 class TrainerError(Exception):
     """Custom exception for validation errors."""
 
-    def __init__(self, message):
+    def __init__(self, message: str):
         super().__init__(message)
         self.message = message
 
 
-@dataclass
 class Trainer:
-    name: str
-    pokemon_team: list[Pokemon] = field(default_factory=list)
-    inventory: dict[str, Item] = field(default_factory=dict)
+    """
+    Represents a Pokémon trainer, optimized for performance in RL environments.
+    - Uses __slots__ to reduce memory footprint.
+    - Inventory is stored as a fixed-size list of integers for O(1) lookups,
+      where the index corresponds to the item's ID in the ItemRegistry.
+    """
 
-    def __post_init__(self):
-        if DEBUG:
-            self.validate_inputs()
+    __slots__ = (
+        "name",
+        "pokemon_team",
+        "_inventory_quantities",
+        "_initial_inventory_quantities",  # Added
+    )
 
-    def copy(self):
+    def __init__(
+        self,
+        name: str,
+        pokemon_team: list[Pokemon],
+        inventory: dict[Item, int] | None = None,
+    ):
+        """
+        Initializes a Trainer.
+        Args:
+            name: The name of the trainer.
+            pokemon_team: A list of up to 6 Pokemon objects.
+            inventory: A dictionary mapping Item objects to their quantities.
+                       This is converted to a more efficient internal representation.
+
+
+        """
+        self.name = name
+        self.pokemon_team = pokemon_team
+        max_item_id = len(ItemRegistry.all())
+        self._inventory_quantities = [0] * max_item_id
+        if inventory:
+            for item, quantity in inventory.items():
+                if 0 <= item.id < max_item_id:
+                    self._inventory_quantities[item.id] = quantity
+        self._initial_inventory_quantities = self._inventory_quantities.copy()
+
+    def get_item_quantity(self, item: Item) -> int:
+        """Efficiently gets the quantity of a given item."""
+        try:
+            return self._inventory_quantities[item.id]
+        except IndexError:
+            return 0
+
+    def get_possessed_items(self) -> list[tuple[Item, int]]:
+        """
+        Returns a list of items the trainer actually possesses.
+        Useful for generating valid action spaces in RL.
+        """
+        return [
+            (ItemRegistry.get(i), qty)
+            for i, qty in enumerate(self._inventory_quantities)
+            if qty > 0
+        ]
+
+    def decrease_item_quantity(self, item: Item):
+        """Decrements the quantity of a given item."""
+        if self._inventory_quantities[item.id] <= 0:
+            raise TrainerError(f"No {item.name} left to use.")
+        self._inventory_quantities[item.id] -= 1
+
+    def copy(self) -> Trainer:
+        """
+        Creates a deep, efficient copy of the Trainer instance.
+        Bypasses __init__ for performance.
+        """
+
         cls = self.__class__
         new_trainer = cls.__new__(cls)
         new_trainer.name = self.name
-        new_trainer.pokemon_team = [pokemon.copy() for pokemon in self.pokemon_team]
-        new_trainer.inventory = {
-            name: item.copy() for name, item in self.inventory.items()
-        }
+        new_trainer.pokemon_team = [p.copy() for p in self.pokemon_team]
+        new_trainer._inventory_quantities = self._inventory_quantities.copy()
+        new_trainer._initial_inventory_quantities = (
+            self._initial_inventory_quantities.copy()
+        )
+
         return new_trainer
 
-    def validate_inputs(self):
-        if not isinstance(self.name, str):
-            raise TrainerError(f"Name must be a string, not {type(self.name).__name__}")
-        if not isinstance(self.pokemon_team, list):
-            raise TrainerError(
-                f"Pokemon team must be a list, not {type(self.pokemon_team).__name__}"
-            )
-        if not all(isinstance(pokemon, Pokemon) for pokemon in self.pokemon_team):
-            raise TrainerError(
-                f"Pokemon team must be a list of Pokemon, not {type(self.pokemon_team).__name__}"
-            )
-        if not isinstance(self.inventory, dict):
-            raise TrainerError(
-                f"Inventory must be a dictionary, not {type(self.inventory).__name__}"
-            )
-        if len(self.pokemon_team) > MAX_POKEMON_PER_TRAINER:
-            raise TrainerError(f"Pokemon team cannot exceed {MAX_POKEMON_PER_TRAINER}")
-        if len(self.inventory) > MAX_ITEMS_PER_TRAINER:
-            raise TrainerError(f"Inventory cannot exceed {MAX_ITEMS_PER_TRAINER}")
-        if not all(
-            isinstance(k, str) and isinstance(v, Item)
-            for k, v in self.inventory.items()
-        ):
-            raise TrainerError(
-                "Inventory must be a dictionary of item names to Item objects."
-            )
+    def switch_pokemon(self, new_pokemon_index: int):
+        """
+        Switches the active Pokémon (at index 0) with another Pokémon in the team.
+        Args:
+            new_pokemon_index: The index of the Pokémon to switch to.
+        """
+        if not (0 < new_pokemon_index < len(self.pokemon_team)):
+            raise TrainerError(f"Invalid Pokémon index for switch: {new_pokemon_index}")
+        if not self.pokemon_team[new_pokemon_index].is_alive:
+            raise TrainerError("Cannot switch to a fainted Pokémon.")
 
-    def switch_pokemon(self, new_pokemon):
-        if DEBUG:
-            if not isinstance(new_pokemon, Pokemon):
-                raise TrainerError(
-                    f"New Pokemon must be an instance of Pokemon, not {type(new_pokemon).__name__}"
-                )
-            if new_pokemon not in self.pokemon_team:
-                raise TrainerError("New Pokemon must be in the team")
-            if not new_pokemon.is_alive:
-                raise TrainerError("New Pokemon must be alive")
-            if new_pokemon == self.pokemon_team[0]:
-                raise TrainerError("New Pokemon must be different from the current one")
-        self.pokemon_team[0].clear()
-        self.pokemon_team.remove(new_pokemon)
-        self.pokemon_team.insert(0, new_pokemon)
+        # Restore status of the currently active pokemon before switching
+        self.pokemon_team[0].restore()
+
+        # Perform the swap
+        (
+            self.pokemon_team[0],
+            self.pokemon_team[new_pokemon_index],
+        ) = (
+            self.pokemon_team[new_pokemon_index],
+            self.pokemon_team[0],
+        )
 
     @property
-    def lowest_alive_pokemon(self) -> Pokemon:
+    def active_pokemon(self) -> Pokemon:
+        """Returns the currently active Pokémon."""
+        return self.pokemon_team[0]
+
+    @property
+    def is_defeated(self) -> bool:
+        """Returns True if all Pokémon on the team are fainted."""
+        return not any(p.is_alive for p in self.pokemon_team)
+
+    @property
+    def lowest_alive_pokemon(self) -> Pokemon | None:
+        """Returns the first alive pokemon in the team, or None if all are fainted."""
         for pokemon in self.pokemon_team:
             if pokemon.is_alive:
                 return pokemon
         return None
 
-    @property
-    def is_defeated(self) -> bool:
-        return all(not pokemon.is_alive for pokemon in self.pokemon_team)
-
-    def switch_to_lowest_alive_pokemon(self):
-        self.switch_pokemon(self.lowest_alive_pokemon)
-
-    def clear_team(self):
-        for pokemon in self.pokemon_team:
-            pokemon.clear()
-
-    def reset_team(self):
-        for pokemon in self.pokemon_team:
-            pokemon.reset()
-
-    def reset_inventory(self):
-        for item in self.inventory.values():
-            item.reset()
-
     def reset(self):
-        self.reset_team()
-        self.reset_inventory()
+        """Resets the trainer's state (Pokemon health and inventory) to initial values."""
+        for p in self.pokemon_team:
+            p.reset()
+        self._inventory_quantities = self._initial_inventory_quantities.copy()
 
     def __repr__(self) -> str:
-        return f"Trainer(name={self.name}, pokemons={self.pokemon_team}, items={self.inventory})"
+        return f"Trainer(name={self.name}, pokemons={self.pokemon_team})"
 
     def __str__(self) -> str:
         return self.name
 
-    @property
-    def str_pokemon_team(self) -> str:
-        text = f"{self.name}'s Pokémon Team:"
-        for i, pokemon in enumerate(self.pokemon_team):
-            text += f"\n[{i + 1}] {pokemon}"
-        return text
+    def describe(self) -> str:
+        """Returns a detailed multi-line string description of the trainer."""
+        lines = [f"{self.name}'s Team:"]
+        for i, p in enumerate(self.pokemon_team):
+            status = "Alive" if p.is_alive else "Fainted"
+            lines.append(f"  [{i}] {p.name} ({status})")
 
-    @property
-    def str_inventory(self) -> str:
-        text = f"{self.name}'s Inventory:"
-        if not self.inventory:
-            text += "\nEmpty..."
+        lines.append(f"{self.name}'s Inventory:")
+        items = self.get_possessed_items()
+        if items:
+            for item, qty in items:
+                lines.append(f"  - {item.name}: {qty}")
         else:
-            for item in self.inventory.values():
-                if item.quantity > 0:
-                    text += f"\n{str(item)}"
-        return text
+            lines.append("  (Empty)")
 
-    @property
-    def memory_size(self) -> int:
-        return asizeof.asizeof(self)
+        return "\n".join(lines)
 
-    @cached_property
-    def pokemon_level_tensor(self) -> torch.Tensor:
-        return torch.tensor([pokemon.level / 100 for pokemon in self.pokemon_team])
+    def __eq__(self, other):
+        if not isinstance(other, Trainer):
+            return NotImplemented
+        return (
+            self.pokemon_team == other.pokemon_team
+            and self._inventory_quantities == other._inventory_quantities
+        )
 
-    @property
-    def tensor(self) -> torch.Tensor:
-        team_size = len(self.pokemon_team)
-
-        if self.pokemon_team:
-            tensor = torch.cat(
-                [
-                    torch.cat([pokemon.one_hot for pokemon in self.pokemon_team]),
-                    POKEMON_PADDING_CACHE[team_size],
-                    torch.tensor([pokemon.hp_ratio for pokemon in self.pokemon_team]),
-                    POKEMON_ZERROS_PADDING_CACHE[team_size],
-                    self.pokemon_level_tensor,
-                    POKEMON_ZERROS_PADDING_CACHE[team_size],
-                    torch.cat(
-                        [pokemon.status.one_hot for pokemon in self.pokemon_team]
-                    ),
-                    POKEMON_STATUS_PADDING_CACHE[team_size],
-                    torch.tensor(
-                        [
-                            int(self.pokemon_team[0]._confused),
-                            int(self.pokemon_team[0]._taunted),
-                        ]
-                    ),
-                    torch.tensor(
-                        [
-                            self.inventory.get(item.name, EMPTY_ITEM).quantity
-                            / MAX_ITEM_QUANTITY
-                            for item in ItemAccessor
-                        ]
-                    ),
-                ]
-            )
-
-        elif not self.pokemon_team:
-            tensor = torch.cat(
-                [
-                    POKEMON_PADDING_CACHE[0],
-                    POKEMON_ZERROS_PADDING_CACHE[team_size],
-                    self.pokemon_level_tensor,
-                    POKEMON_ZERROS_PADDING_CACHE[team_size],
-                    POKEMON_STATUS_PADDING_CACHE[0],
-                    ZEROS_TENSOR_CACHE[2],
-                    torch.tensor(
-                        [
-                            self.inventory.get(item.name, EMPTY_ITEM).quantity
-                            / MAX_ITEM_QUANTITY
-                            for item in ItemAccessor
-                        ]
-                    ),
-                ]
-            )
-
-        return tensor
-
-    @cached_property
-    def tensor_description(self):
-        return TRAINER_TENSOR_DESCRIPTION
-
-
-TRAINER_TENSOR_DESCRIPTION = []
-TRAINER_TENSOR_DESCRIPTION = []
-for i in range(MAX_POKEMON_PER_TRAINER):
-    TRAINER_TENSOR_DESCRIPTION += [
-        f"Pokemon {i} " + text for text in POKEMON_ONE_HOT_DESCRIPTION
-    ]
-TRAINER_TENSOR_DESCRIPTION += [
-    f"Pokemon {i} HP Ratio" for i in range(MAX_POKEMON_PER_TRAINER)
-]
-TRAINER_TENSOR_DESCRIPTION += [
-    f"Pokemon {i} Level" for i in range(MAX_POKEMON_PER_TRAINER)
-]
-for i in range(MAX_POKEMON_PER_TRAINER):
-    TRAINER_TENSOR_DESCRIPTION += [
-        f"Pokemon {i} " + text for text in POKEMON_STATUS_ONE_HOT_DESCRIPTION
-    ]
-TRAINER_TENSOR_DESCRIPTION += ["Active Pokemon Confused"]
-TRAINER_TENSOR_DESCRIPTION += ["Active Pokemon Taunted"]
-TRAINER_TENSOR_DESCRIPTION += [f"Item {item.name} Quantity" for item in ItemAccessor]
+    def __hash__(self):
+        return hash((tuple(self.pokemon_team), tuple(self._inventory_quantities)))

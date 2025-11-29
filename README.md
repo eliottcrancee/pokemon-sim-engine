@@ -30,17 +30,33 @@ Or using `uv` (recommended):
 uv sync
 ```
 
-## 🎮 Quick Start
+## 🎮 Quick Start & Interactive Playground
 
-### Running a UI Battle
+This project offers multiple ways to get started and explore the battle system.
 
-To jump straight into a battle between Ash and Gary:
+### Running a Quick UI Battle
+
+To jump straight into a basic UI battle (You vs. AI):
 
 ```bash
 uv run python src/quick_start.py
 ```
 
 ![UI Example](ui.png)
+
+### The Interactive Playground
+
+For a more comprehensive experience, the interactive playground allows you to:
+*   **Play a UI Battle**: Experience the battle system firsthand against an AI.
+*   **Simulate Agent vs. Agent**: Pit two AI agents against each other and compare their performance over many battles.
+*   **Run a Tournament**: Evaluate a pool of agents using a Glicko-2 rating system.
+*   **Test Agent Performance**: Benchmark the execution speed of any agent's `get_action` method.
+
+To launch the interactive playground:
+
+```bash
+uv run python src/playground.py
+```
 
 ## 📖 Usage Guide
 
@@ -49,28 +65,25 @@ Here is a complete example of how to set up a battle programmatically.
 ### 1. Setup Trainers and Pokemon
 
 ```python
-from pokemon.pokemon import PokemonAccessor
-from pokemon.item import ItemAccessor
+from pokemon.pokemon import Pokemon, Pokedex
+from pokemon.item import Items
 from pokemon.trainer import Trainer
 
 # Create Pokemon instances
-pikachu = PokemonAccessor.Pikachu(level=50)
-charmander = PokemonAccessor.Charmander(level=50)
-
-# Create Items
-potion = ItemAccessor.Potion(default_quantity=2)
+pikachu = Pokemon(species=Pokedex.Pikachu, level=50)
+charmander = Pokemon(species=Pokedex.Charmander, level=50)
 
 # Create Trainers
 ash = Trainer(
     name="Ash",
     pokemon_team=[pikachu],
-    inventory={potion.name: potion}
+    inventory={Items.Potion: 2}
 )
 
 gary = Trainer(
     name="Gary",
     pokemon_team=[charmander],
-    inventory={potion.name: potion}
+    inventory={Items.Potion: 2}
 )
 ```
 

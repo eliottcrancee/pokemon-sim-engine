@@ -1,16 +1,8 @@
-# src/pokemon/agents/base_agent.py
-"""This module defines the base classes for all agents."""
-
-from __future__ import annotations
-
 import abc
-from typing import TYPE_CHECKING, Union
 
-from pokemon.action import Action, ActionError
+from pokemon.action import Action
+from pokemon.battle import Battle
 from pokemon.glicko2 import calculate_new_rating
-
-if TYPE_CHECKING:
-    from pokemon.battle import Battle
 
 
 class BaseAgent(abc.ABC):
@@ -29,7 +21,7 @@ class BaseAgent(abc.ABC):
     @abc.abstractmethod
     def get_action(
         self, battle: Battle, trainer_id: int, verbose: bool = False
-    ) -> Union[Action, list[Action]]:
+    ) -> Action:
         """Get the action for the agent.
         This method must be implemented by subclasses.
         Args:
@@ -50,48 +42,6 @@ class BaseAgent(abc.ABC):
         """
         self.rating, self.rating_deviation = calculate_new_rating(
             self.rating, self.rating_deviation, period_results
-        )
-
-    @staticmethod
-    def translate_action(
-        action: Action,
-        new_battle: Battle,
-        trainer_id: int,
-    ) -> Action | None:
-        """Translate an action from one battle context to another.
-        This is useful for simulations where battle objects are copied.
-        Args:
-            action: The action to translate.
-            new_battle: The new battle context.
-            trainer_id: The ID of the trainer performing the action.
-        Returns:
-            The translated action, or None if the action is None.
-        Raises:
-            ActionError: If an item in the action is not found in the new
-                trainer's inventory.
-        """
-        if action is None:
-            return None
-
-        new_trainer = new_battle.get_trainer_by_id(trainer_id)
-        new_opponent = new_battle.get_trainer_by_id(1 - trainer_id)
-
-        new_item = None
-        if action.item:
-            new_item = new_trainer.inventory.get(action.item.name)
-            if new_item is None:
-                raise ActionError(
-                    f"Item {action.item.name} not found in trainer "
-                    f"{new_trainer.name}'s inventory"
-                )
-
-        return Action(
-            action_type=action.action_type,
-            trainer=new_trainer,
-            opponent=new_opponent,
-            move=action.move,
-            target_index=action.target_index,
-            item=new_item,
         )
 
     def __str__(self) -> str:
@@ -122,7 +72,9 @@ class EvaluatingAgent(BaseAgent, abc.ABC):
         trainer = battle.get_trainer_by_id(trainer_id)
         hp_score = sum(p.hp / p.max_hp for p in trainer.pokemon_team if p.is_alive)
         alive_bonus = sum(0.5 for p in trainer.pokemon_team if p.is_alive)
-        item_bonus = sum(0.2 * i.quantity for i in trainer.inventory.values())
+        item_bonus = sum(
+            0.2 * quantity for item, quantity in trainer.get_possessed_items()
+        )
         return hp_score + alive_bonus + item_bonus
 
     def _evaluate_battle(self, battle: Battle, trainer_id: int) -> float:

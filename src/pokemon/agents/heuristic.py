@@ -1,37 +1,10 @@
-# src/pokemon/agents/heuristic.py
-"""This module defines agents that use heuristics to make decisions."""
-
-from __future__ import annotations
-
 import random
-from typing import TYPE_CHECKING, Optional
 
 from pokemon.action import Action, ActionType
-
-if TYPE_CHECKING:
-    from pokemon.battle import Battle
+from pokemon.battle import Battle
+from pokemon.item import ItemRegistry
 
 from .base_agent import BaseAgent
-
-
-def _get_best_heal_action(actions: list[Action]) -> Optional[Action]:
-    """Return the best healing action from a list of actions.
-    It is assumed that higher item IDs correspond to better potions.
-    Args:
-        actions: A list of possible actions.
-    Returns:
-        The best healing action, or None if no healing actions are available.
-    """
-    heal_actions = [
-        a
-        for a in actions
-        if a.action_type == ActionType.USE_ITEM
-        and a.item is not None
-        and "Potion" in a.item.name
-    ]
-    if not heal_actions:
-        return None
-    return max(heal_actions, key=lambda a: a.item.item_id)
 
 
 class RandomAttackAndPotionAgent(BaseAgent):
@@ -40,12 +13,6 @@ class RandomAttackAndPotionAgent(BaseAgent):
     def __init__(
         self, name: str = "RandomAttackAndPotion", heal_threshold: float = 0.2
     ):
-        """Initialize the agent.
-        Args:
-            name: The name of the agent.
-            heal_threshold: The HP percentage below which the agent will try to
-                use a healing item.
-        """
         name = f"{name}(heal_threshold={heal_threshold})"
         super().__init__(name)
         self.heal_threshold = heal_threshold
@@ -57,24 +24,18 @@ class RandomAttackAndPotionAgent(BaseAgent):
         - If HP is below `heal_threshold`, uses a random available "Potion" item.
         - Otherwise, performs a random attack.
         - If no attack is possible, performs a random action.
-        Args:
-            battle: The current battle state.
-            trainer_id: The ID of the trainer for which to get the action.
-            verbose: Whether to log verbose output.
-        Returns:
-            The chosen action.
         """
         trainer = battle.get_trainer_by_id(trainer_id)
         current_pokemon = trainer.pokemon_team[0]
         actions = battle.get_possible_actions(trainer_id)
-
+        if len(actions) == 1:
+            return actions[0]
         if current_pokemon.hp / current_pokemon.max_hp < self.heal_threshold:
             heal_actions = [
                 a
                 for a in actions
                 if a.action_type == ActionType.USE_ITEM
-                and a.item is not None
-                and "Potion" in a.item.name
+                and "Potion" in ItemRegistry.get(a.item_id).name
             ]
             if heal_actions:
                 return random.choice(heal_actions)
@@ -95,10 +56,6 @@ class BestAttackAgent(BaseAgent):
     """Agent that selects the attack action with the highest power."""
 
     def __init__(self, name: str = "BestAttack"):
-        """Initialize the agent.
-        Args:
-            name: The name of the agent.
-        """
         super().__init__(name)
 
     def get_action(
@@ -106,31 +63,29 @@ class BestAttackAgent(BaseAgent):
     ) -> Action:
         """Return the attack action with the highest base power.
         If no attack is possible, returns a random action.
-        Args:
-            battle: The current battle state.
-            trainer_id: The ID of the trainer for which to get the action.
-            verbose: Whether to log verbose output.
-        Returns:
-            The chosen action.
         """
         actions = battle.get_possible_actions(trainer_id)
+        if len(actions) == 1:
+            return actions[0]
         attack_actions = [a for a in actions if a.action_type == ActionType.ATTACK]
         if not attack_actions:
             return random.choice(actions)
 
-        return max(attack_actions, key=lambda a: a.move.power if a.move else 0)
+        trainer = battle.get_trainer_by_id(trainer_id)
+        pokemon = trainer.pokemon_team[0]
+
+        def get_move_power(action: Action) -> int:
+            move = pokemon.move_slots[action.move_slot_index].move
+            return move.power or 0
+
+        return max(attack_actions, key=get_move_power)
 
 
 class BestAttackAndPotionAgent(BaseAgent):
     """Agent that uses the best attack, but uses a potion if HP is low."""
 
     def __init__(self, name: str = "BestAttackAndPotion", heal_threshold: float = 0.2):
-        """Initialize the agent.
-        Args:
-            name: The name of the agent.
-            heal_threshold: The HP percentage below which the agent will try
-                to use a healing item.
-        """
+        """Initialize the agent."""
         name = f"{name}(heal_threshold={heal_threshold})"
         super().__init__(name)
         self.heal_threshold = heal_threshold
@@ -142,30 +97,181 @@ class BestAttackAndPotionAgent(BaseAgent):
         - If HP is below `heal_threshold`, uses the best available "Potion" item.
         - Otherwise, performs the attack with the highest base power.
         - If no attack is possible, performs a random action.
-        Args:
-            battle: The current battle state.
-            trainer_id: The ID of the trainer for which to get the action.
-            verbose: Whether to log verbose output.
-        Returns:
-            The chosen action.
         """
         trainer = battle.get_trainer_by_id(trainer_id)
         current_pokemon = trainer.pokemon_team[0]
         actions = battle.get_possible_actions(trainer_id)
-
+        if len(actions) == 1:
+            return actions[0]
         if current_pokemon.hp / current_pokemon.max_hp < self.heal_threshold:
-            heal_action = _get_best_heal_action(actions)
-            if heal_action:
-                return heal_action
+            heal_actions = [
+                a
+                for a in actions
+                if a.action_type == ActionType.USE_ITEM
+                and "Potion" in ItemRegistry.get(a.item_id).name
+            ]
+            if heal_actions:
+                return random.choice(heal_actions)
 
         attack_actions = [a for a in actions if a.action_type == ActionType.ATTACK]
         if not attack_actions:
             return random.choice(actions)
 
-        return max(attack_actions, key=lambda a: a.move.power if a.move else 0)
+        pokemon = trainer.pokemon_team[0]
+
+        def get_move_power(action: Action) -> int:
+            move = pokemon.move_slots[action.move_slot_index].move
+            return move.power or 0
+
+        return max(attack_actions, key=get_move_power)
 
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}(name='{self.name}', "
             f"heal_threshold={self.heal_threshold})"
         )
+
+
+class SmarterHeuristicAgent(BaseAgent):
+    """
+    A more advanced heuristic agent that scores each action to make a choice.
+    - Scores attacks based on power, type effectiveness, and STAB.
+    - Scores switching based on type advantages and disadvantages.
+    - Scores healing items based on HP restored and avoiding waste.
+    """
+
+    def __init__(
+        self,
+        name: str = "SmarterHeuristic",
+        heal_threshold: float = 0.5,
+        switch_hp_threshold: float = 0.3,
+    ):
+        name = f"{name}(heal_t={heal_threshold}, switch_t={switch_hp_threshold})"
+        super().__init__(name)
+        self.heal_threshold = heal_threshold
+        self.switch_hp_threshold = switch_hp_threshold
+
+    def get_action(
+        self, battle: Battle, trainer_id: int, verbose: bool = False
+    ) -> Action:
+        possible_actions = battle.get_possible_actions(trainer_id)
+        if len(possible_actions) == 1:
+            return possible_actions[0]
+
+        scored_actions = [
+            (self._score_action(action, battle, trainer_id), action)
+            for action in possible_actions
+        ]
+
+        # Choose the action with the highest score.
+        # If scores are tied, random.choice will pick one.
+        best_score = max(s[0] for s in scored_actions)
+        best_actions = [a for s, a in scored_actions if s == best_score]
+
+        return random.choice(best_actions)
+
+    def _score_action(self, action: Action, battle: Battle, trainer_id: int) -> float:
+        """Dispatcher to score an action based on its type."""
+        if action.action_type == ActionType.ATTACK:
+            return self._score_attack(action, battle, trainer_id)
+        if action.action_type == ActionType.SWITCH:
+            return self._score_switch(action, battle, trainer_id)
+        if action.action_type == ActionType.USE_ITEM:
+            return self._score_item(action, battle, trainer_id)
+        # Pass action
+        return 0.0
+
+    def _score_attack(self, action: Action, battle: Battle, trainer_id: int) -> float:
+        """Scores an attack based on power, effectiveness, and STAB."""
+        user = battle.get_trainer_by_id(trainer_id).active_pokemon
+        target = battle.get_trainer_by_id(1 - trainer_id).active_pokemon
+
+        if action.move_slot_index == -1:  # Struggle
+            return 1.0  # Low but non-zero score
+
+        move = user.move_slots[action.move_slot_index].move
+        if move.power == 0:  # For now, ignore status moves
+            return 0.0
+
+        effectiveness = move.type.effectiveness_against(target.types)
+        if effectiveness == 0:
+            return -1.0  # Heavily penalize moves with no effect
+
+        stab = 1.5 if move.type in user.types else 1.0
+        score = move.power * effectiveness * stab
+
+        # Bonus for moves with high priority
+        if move.priority > 0:
+            score *= 1.2
+
+        return score
+
+    def _score_switch(self, action: Action, battle: Battle, trainer_id: int) -> float:
+        """Scores switching to another Pokemon."""
+        trainer = battle.get_trainer_by_id(trainer_id)
+        opponent = battle.get_trainer_by_id(1 - trainer_id).active_pokemon
+        current_pokemon = trainer.active_pokemon
+        new_pokemon = trainer.pokemon_team[action.pokemon_index]
+
+        # 1. Calculate opponent's offensive advantage against our current pokemon
+        current_disadvantage = max(
+            t.effectiveness_against(current_pokemon.types) for t in opponent.types
+        )
+
+        # 2. Calculate our new pokemon's defensive advantage against the opponent
+        max_effectiveness_against_us = max(
+            t.effectiveness_against(new_pokemon.types) for t in opponent.types
+        )
+        if max_effectiveness_against_us == 0:
+            # Full immunity is a huge advantage
+            new_defensive_advantage = 10.0
+        else:
+            new_defensive_advantage = 1 / max_effectiveness_against_us
+
+        # 3. Calculate our new pokemon's offensive advantage against the opponent
+        new_offensive_advantage = max(
+            t.effectiveness_against(opponent.types) for t in new_pokemon.types
+        )
+
+        # Base score is a combination of new advantages minus current disadvantage.
+        # Switching has an inherent cost (a free turn for the opponent), so we penalize it slightly.
+        score = new_defensive_advantage + new_offensive_advantage - current_disadvantage
+
+        # Strongly incentivize switching if current pokemon is low on health and at a disadvantage
+        if (
+            current_pokemon.hp / current_pokemon.max_hp < self.switch_hp_threshold
+            and current_disadvantage > 1
+        ):
+            score += 100
+
+        # Penalize switching to a pokemon with a type disadvantage
+        if new_defensive_advantage < 1:
+            score -= 50
+
+        return score
+
+    def _score_item(self, action: Action, battle: Battle, trainer_id: int) -> float:
+        """Scores using a healing item."""
+        trainer = battle.get_trainer_by_id(trainer_id)
+        item = ItemRegistry.get(action.item_id)
+        target = trainer.pokemon_team[action.target_index]
+
+        # Only score healing items for now
+        if "Potion" not in item.name and "Heal" not in item.name:
+            return 0.0
+
+        if target.hp / target.max_hp > self.heal_threshold:
+            return -1.0  # Don't heal if HP is high
+
+        # Simplified scoring: base on item name
+        # This is a simple heuristic; a better one would inspect the item's effect.
+        if "Hyper Potion" in item.name:
+            return 200
+        if "Super Potion" in item.name:
+            return 150
+        if "Potion" in item.name:
+            return 100
+        if "Full Heal" in item.name and target.status != "HEALTHY":
+            return 80  # Curing status is valuable
+
+        return 0.0

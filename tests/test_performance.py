@@ -6,41 +6,38 @@ from joblib import Parallel, cpu_count, delayed
 
 from pokemon.agents import FirstAgent
 from pokemon.battle import Battle
-from pokemon.item import ItemAccessor
-from pokemon.pokemon import PokemonAccessor
+from pokemon.item import Items
+from pokemon.pokemon import Pokedex, Pokemon
 from pokemon.trainer import Trainer
 
 
-def battle_generator():
-    """Creates a standard battle instance for performance testing."""
-
-    trainer1 = Trainer(
-        name="Ash",
+def create_trainer(name):
+    return Trainer(
+        name=name,
         pokemon_team=[
-            PokemonAccessor.Pikachu(level=12),
-            PokemonAccessor.Chimchar(level=10),
+            Pokemon(species=Pokedex.Pikachu, level=10),
+            Pokemon(species=Pokedex.Charmander, level=10),
+            Pokemon(species=Pokedex.Squirtle, level=10),
         ],
         inventory={
-            ItemAccessor.Potion.name: ItemAccessor.Potion(default_quantity=1),
-            ItemAccessor.SuperPotion.name: ItemAccessor.SuperPotion(default_quantity=1),
+            Items.Potion: 1,
+            Items.SuperPotion: 1,
         },
     )
-    trainer2 = Trainer(
-        name="Gary",
-        pokemon_team=[PokemonAccessor.Piplup(level=11)],
-        inventory={
-            ItemAccessor.Potion.name: ItemAccessor.Potion(default_quantity=1),
-            ItemAccessor.SuperPotion.name: ItemAccessor.SuperPotion(default_quantity=1),
-        },
-    )
-    return Battle(trainer1, trainer2)
+
+
+def create_battle():
+    ash = create_trainer("Ash")
+    gary = create_trainer("Gary")
+    battle = Battle((ash, gary), max_rounds=100)
+    return battle
 
 
 def test_performance_battle_turns(benchmark):
     """Benchmarks how many turns of a battle can be run per second."""
     agent_0 = FirstAgent()
     agent_1 = FirstAgent()
-    battle = battle_generator()
+    battle = create_battle()
 
     def run_turn():
         if battle.done:
@@ -81,7 +78,43 @@ def battle_worker(duration: int, battle: Battle = None) -> int:
     return turns_count
 
 
-def parallel_stress_test_turns(duration: int = 10):
+def battle_worker_timed(n_runs: int, battle: Battle = None) -> int:
+    """Worker function to run continuous battle turns for a specified duration
+    and report the total number of turns completed.
+    """
+    agent_0 = FirstAgent()
+    agent_1 = FirstAgent()
+
+    reset_time = 0.0
+    action_time = 0.0
+    turn_time = 0.0
+
+    for _ in range(n_runs):
+        if battle.done:
+            start_reset = time.perf_counter()
+            battle.reset()
+            end_reset = time.perf_counter()
+            reset_time += end_reset - start_reset
+
+        # Get actions
+        start_action = time.perf_counter()
+        action_0 = agent_0.get_action(battle, 0)
+        action_1 = agent_1.get_action(battle, 1)
+        end_action = time.perf_counter()
+        action_time += end_action - start_action
+
+        # Execute turn
+        start_turn = time.perf_counter()
+        battle.turn(action_0, action_1)
+        end_turn = time.perf_counter()
+        turn_time += end_turn - start_turn
+
+    print(
+        f"Reset Time: {reset_time:.6f}s, Action Time: {action_time:.6f}s, Turn Time: {turn_time:.6f}s"
+    )
+
+
+def parallel_stress_test_turns(duration: int = 20):
     """Performs a parallel stress test to determine the maximum number of battle
     turns possible across all CPU cores within a specified duration.
     """
@@ -96,7 +129,7 @@ def parallel_stress_test_turns(duration: int = 10):
 
     start_time = time.perf_counter()
     results = Parallel(n_jobs=num_process)(
-        delayed(battle_worker)(duration, battle_generator()) for _ in range(num_process)
+        delayed(battle_worker)(duration, create_battle()) for _ in range(num_process)
     )
     end_time = time.perf_counter()
 
@@ -108,4 +141,5 @@ def parallel_stress_test_turns(duration: int = 10):
 
 
 if __name__ == "__main__":
+    # battle_worker_timed(1000, battle_generator())
     parallel_stress_test_turns()

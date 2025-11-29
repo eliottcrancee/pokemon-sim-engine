@@ -1,53 +1,34 @@
 import os
 import sys
 
-# Ensure src directory is in path
-sys.path.append(os.path.join(os.getcwd(), "src"))
-
-from pokemon.agents import InputAgent, OneStepUniformExpectimaxAgent
-from pokemon.battle import Battle
-from pokemon.item import ItemAccessor
-from pokemon.pokemon import PokemonAccessor
-from pokemon.trainer import Trainer
+from pokemon.agents import InputAgent, SmarterHeuristicAgent
+from pokemon.battle_registry import BattleRegistry
 from pokemon.ui import play_ui
 
 
 def main():
-    ash = Trainer(
-        name="Ash",
-        pokemon_team=[
-            PokemonAccessor.Pikachu(level=12),
-            PokemonAccessor.Charmander(level=12),
-            PokemonAccessor.Squirtle(level=12),
-        ],
-        inventory={
-            ItemAccessor.Potion.name: ItemAccessor.Potion(default_quantity=1),
-            ItemAccessor.SuperPotion.name: ItemAccessor.SuperPotion(default_quantity=1),
-        },
-    )
+    print("--- Quick Start UI Battle ---")
 
-    gary = Trainer(
-        name="Gary",
-        pokemon_team=[
-            PokemonAccessor.Pikachu(level=12),
-            PokemonAccessor.Charmander(level=12),
-            PokemonAccessor.Squirtle(level=12),
-        ],
-        inventory={
-            ItemAccessor.Potion.name: ItemAccessor.Potion(default_quantity=1),
-            ItemAccessor.SuperPotion.name: ItemAccessor.SuperPotion(default_quantity=1),
-        },
-    )
+    # Load a battle from the registry
+    battle_name = "kanto_classic"
+    battle = BattleRegistry.get(battle_name)
+    
+    if not battle:
+        print(f"Error: Battle '{battle_name}' not found in registry. Exiting quick start.")
+        return
 
-    # Create Agents
-    ash_agent = InputAgent()
-    gary_agent = OneStepUniformExpectimaxAgent()
+    # Create Agents (You against a Smarter Heuristic AI)
+    player_agent = InputAgent()
+    ai_agent = SmarterHeuristicAgent()
 
-    # Create Battle
-    battle = Battle(trainer_0=ash, trainer_1=gary, max_rounds=100)
+    print(f"\nStarting a quick UI battle: You vs. {ai_agent.name} in '{battle_name}'!")
+    print("Loading...")
+    
+    play_ui(battle, player_agent, ai_agent)
 
-    print("Starting UI Battle...")
-    play_ui(battle, ash_agent, gary_agent)
+    print("\n--- Quick Start Complete ---")
+    print("For more options (Agent vs. Agent, Tournaments, Performance Tests),")
+    print("run 'python src/playground.py' from your terminal.")
 
 
 if __name__ == "__main__":

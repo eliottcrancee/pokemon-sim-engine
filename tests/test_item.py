@@ -1,129 +1,136 @@
-# tests/test_item.py
-
 import pytest
 
-from pokemon.item import ItemAccessor, ItemError, Potion
-from pokemon.pokemon import PokemonAccessor, PokemonStatus
+from pokemon.item import HealHP, ItemCategory, ItemError, ItemRegistry, Items
+from pokemon.pokemon import Pokedex, Pokemon, PokemonStatus
+
+# --- Fixtures ---
 
 
 @pytest.fixture
-def pokemon():
-    """Fixture to provide a Pokemon instance for item tests."""
-    p = PokemonAccessor.Pikachu(level=10)
-    p.reset()  # Ensure it's at full health
-    return p
+def pikachu():
+    """Creates a healthy Level 10 Pikachu."""
+    return Pokemon(Pokedex.Pikachu, level=10)
 
 
-def test_item_enum_and_creation():
-    """Tests the creation of items via the ItemEnum."""
-    potion = ItemAccessor.Potion(default_quantity=2)
-    assert isinstance(potion, Potion)
-    assert potion.quantity == 2
+@pytest.fixture
+def injured_pikachu(pikachu: Pokemon):
+    """Creates a Pikachu with 1 HP."""
+    pikachu.hp = 1
+    return pikachu
+
+
+@pytest.fixture
+def fainted_pikachu(pikachu: Pokemon):
+    """Creates a fainted Pikachu."""
+    pikachu.hp = 0
+    pikachu.is_alive = False
+    pikachu.status = PokemonStatus.FAINTED
+    return pikachu
+
+
+@pytest.fixture
+def burned_pikachu(pikachu: Pokemon):
+    """Creates a burned Pikachu with full HP."""
+    pikachu.status = PokemonStatus.BURN
+    return pikachu
+
+
+# --- Test Functions ---
+
+
+def test_potion_heals_hp(injured_pikachu: Pokemon):
+    """Test that a Potion heals exactly 20 HP."""
+    initial_hp = injured_pikachu.hp  # Should be 10
+
+    # Apply Potion
+    messages = Items.Potion.use(injured_pikachu)
+
+    assert injured_pikachu.hp == initial_hp + 20
+    assert "recovered 20 HP" in messages[0].text
+
+
+def test_super_potion_caps_at_max_hp(injured_pikachu: Pokemon):
+    """Test that healing does not exceed max_hp."""
+    # Ensure healing 50 would exceed max HP if max is low,
+    # or simply heal 50 if max is high.
+    # Let's assume lvl 10 Pikachu has > 10 HP but < 200 HP.
+
+    injured_pikachu.hp = injured_pikachu.max_hp - 10  # 10 HP missing
+
+    # Apply Super Potion (Heals 50)
+    messages = Items.SuperPotion.use(injured_pikachu)
+
+    assert injured_pikachu.hp == injured_pikachu.max_hp
+    assert "recovered 10 HP" in messages[0].text  # Should report actual amount
+
+
+def test_cannot_heal_full_hp_pokemon(pikachu):
+    """Test that medicine cannot be used on a healthy pokemon."""
+    assert Items.Potion.can_use(pikachu) is False
+
+    messages = Items.Potion.use(pikachu)
+    assert messages[0].text == "It won't have any effect."
+
+
+def test_full_heal_cures_status(burned_pikachu):
+    """Test that Full Heal cures a status condition."""
+    assert Items.FullHeal.can_use(burned_pikachu) is True
+
+    messages = Items.FullHeal.use(burned_pikachu)
+
+    assert burned_pikachu.status == PokemonStatus.HEALTHY
+    assert "cured of its status" in messages[0].text
+
+
+def test_full_heal_useless_on_healthy(pikachu):
+    """Test that Full Heal cannot be used if no status exists."""
+    assert Items.FullHeal.can_use(pikachu) is False
+
+
+def test_revive_works_on_fainted(fainted_pikachu):
+    """Test that Revive brings a pokemon back to life with 50% HP."""
+    assert Items.Revive.can_use(fainted_pikachu) is True
+
+    messages = Items.Revive.use(fainted_pikachu)
+
+    assert fainted_pikachu.is_alive is True
+    assert fainted_pikachu.status == PokemonStatus.HEALTHY
+    assert fainted_pikachu.hp == fainted_pikachu.max_hp // 2
+    assert "was revived" in messages[0].text
+
+
+def test_max_revive_fully_restores(fainted_pikachu):
+    """Test that Max Revive brings a pokemon back with 100% HP."""
+    Items.MaxRevive.use(fainted_pikachu)
+
+    assert fainted_pikachu.is_alive is True
+    assert fainted_pikachu.hp == fainted_pikachu.max_hp
+
+
+def test_revive_cannot_use_on_living(injured_pikachu):
+    """Test that Revive cannot be used on a living pokemon."""
+    assert Items.Revive.can_use(injured_pikachu) is False
+
+
+def test_item_registry_lookup():
+    """Test that items can be retrieved via the Registry."""
+    potion = ItemRegistry.get("Potion")
+    assert potion is not None
     assert potion.name == "Potion"
 
-
-def test_potion_use(pokemon):
-    """Tests using a Potion."""
-    pokemon.hp -= 15
-    initial_hp = pokemon.hp
-    potion = ItemAccessor.Potion()
-
-    assert potion.validate(pokemon) is True
-
-    messages = potion.use(pokemon)
-
-    assert pokemon.hp == min(initial_hp + 20, pokemon.max_hp)
-    assert "restored" in messages[0].content
-    assert potion.quantity == 0
+    # Test case insensitivity and spacing
+    super_potion = ItemRegistry.get("super potion")
+    assert super_potion.name == "Super Potion"
 
 
-def test_revive_use(pokemon):
-    """Tests using a Revive."""
-    pokemon.hp = 0
-    assert not pokemon.is_alive
-
-    revive = ItemAccessor.Revive()
-
-    assert revive.validate(pokemon) is True
-
-    messages = revive.use(pokemon)
-
-    assert pokemon.is_alive
-    assert pokemon.hp == pokemon.max_hp // 2
-    assert "revived with 50% HP" in messages[0].content
-    assert revive.quantity == 0
+def test_registry_duplicate_error():
+    """Test that registering an item with an existing name raises an error."""
+    # We must try to register a name that already exists (e.g., 'Potion')
+    with pytest.raises(ItemError):
+        ItemRegistry.register("Potion", ItemCategory.MEDICINE, HealHP(10), "desc")
 
 
-def test_full_heal_use(pokemon):
-    """Tests using a Full Heal."""
-    pokemon.status = PokemonStatus.Burn
-    full_heal = ItemAccessor.FullHeal()
-
-    assert full_heal.validate(pokemon) is True
-
-    messages = full_heal.use(pokemon)
-
-    assert pokemon.status == PokemonStatus.Healthy
-    assert "fully cured" in messages[0].content
-
-
-def test_item_validation(pokemon):
-    """Tests the validation logic of items."""
-    potion = ItemAccessor.Potion()
-    revive = ItemAccessor.Revive()
-
-    # Can't use Potion on a full health pokemon
-    assert potion.validate(pokemon) is False
-
-    # Can't use Revive on an alive pokemon
-    assert revive.validate(pokemon) is False
-
-    pokemon.hp = 0
-    # Can't use Potion on a fainted pokemon
-    assert potion.validate(pokemon) is False
-    # Can use Revive on a fainted pokemon
-    assert revive.validate(pokemon) is True
-
-
-def test_invalid_item_usage(pokemon):
-    """Tests that using an item under invalid conditions raises an error."""
-    revive = ItemAccessor.Revive()
-    # The use method itself doesn't re-validate, it assumes validation passed.
-    # The check for quantity is inside the use method if DEBUG is on.
-    # Let's test running out of items.
-    revive.quantity = 0
-    pokemon.hp = 0
-
-    # This check is inside a DEBUG block, so this test may not fail
-    # if DEBUG is false.
-    try:
-        with pytest.raises(ItemError):
-            revive.use(pokemon)
-    except Exception:
-        # If no exception is raised because DEBUG is off, we just pass.
-        pass
-
-
-def test_item_one_hot_encoding():
-    """Tests the one-hot encoding of an item."""
-    potion = ItemAccessor.Potion()
-    one_hot = potion.one_hot
-
-    assert one_hot[ItemAccessor.Potion.item_id] == 1
-    assert one_hot.sum() == 1
-
-
-# --- Performance Test ---
-
-
-def test_performance_item_use(benchmark, pokemon):
-    """Performance test for the item 'use' method."""
-    potion = ItemAccessor.Potion(default_quantity=2)  # High quantity for benchmark
-
-    def use_potion():
-        pokemon.hp = 1  # Set hp low
-        potion.use(pokemon)
-        pokemon.hp = pokemon.max_hp  # Reset for next run
-        potion.quantity += 1  # Don't run out
-
-    benchmark(use_potion)
+def test_items_accessor_attribute_error():
+    """Test accessing a non-existent item via Items class."""
+    with pytest.raises(AttributeError):
+        _ = Items.MasterSword
