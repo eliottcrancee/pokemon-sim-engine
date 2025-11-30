@@ -3,6 +3,8 @@ import random
 from pokemon.action import Action, ActionType
 from pokemon.battle import Battle
 from pokemon.item import ItemRegistry
+from pokemon.move import Move
+from pokemon.pokemon import Pokemon
 
 from .base_agent import BaseAgent
 
@@ -13,7 +15,7 @@ class RandomAttackAndPotionAgent(BaseAgent):
     def __init__(
         self, name: str = "RandomAttackAndPotion", heal_threshold: float = 0.2
     ):
-        name = f"{name}(heal_threshold={heal_threshold})"
+        name = f"{name}(heal_t={heal_threshold})"
         super().__init__(name)
         self.heal_threshold = heal_threshold
 
@@ -44,12 +46,6 @@ class RandomAttackAndPotionAgent(BaseAgent):
         if not attack_actions:
             return random.choice(actions)
         return random.choice(attack_actions)
-
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}(name='{self.name}', "
-            f"heal_threshold={self.heal_threshold})"
-        )
 
 
 class BestAttackAgent(BaseAgent):
@@ -86,7 +82,7 @@ class BestAttackAndPotionAgent(BaseAgent):
 
     def __init__(self, name: str = "BestAttackAndPotion", heal_threshold: float = 0.2):
         """Initialize the agent."""
-        name = f"{name}(heal_threshold={heal_threshold})"
+        name = f"{name}(heal_t={heal_threshold})"
         super().__init__(name)
         self.heal_threshold = heal_threshold
 
@@ -125,12 +121,6 @@ class BestAttackAndPotionAgent(BaseAgent):
 
         return max(attack_actions, key=get_move_power)
 
-    def __repr__(self) -> str:
-        return (
-            f"{self.__class__.__name__}(name='{self.name}', "
-            f"heal_threshold={self.heal_threshold})"
-        )
-
 
 class SmarterHeuristicAgent(BaseAgent):
     """
@@ -143,8 +133,8 @@ class SmarterHeuristicAgent(BaseAgent):
     def __init__(
         self,
         name: str = "SmarterHeuristic",
-        heal_threshold: float = 0.5,
-        switch_hp_threshold: float = 0.3,
+        heal_threshold: float = 0.3,
+        switch_hp_threshold: float = 0.4,
     ):
         name = f"{name}(heal_t={heal_threshold}, switch_t={switch_hp_threshold})"
         super().__init__(name)
@@ -190,6 +180,7 @@ class SmarterHeuristicAgent(BaseAgent):
             return 1.0  # Low but non-zero score
 
         move = user.move_slots[action.move_slot_index].move
+        move: Move
         if move.power == 0:  # For now, ignore status moves
             return 0.0
 
@@ -212,6 +203,7 @@ class SmarterHeuristicAgent(BaseAgent):
         opponent = battle.get_trainer_by_id(1 - trainer_id).active_pokemon
         current_pokemon = trainer.active_pokemon
         new_pokemon = trainer.pokemon_team[action.pokemon_index]
+        new_pokemon: Pokemon
 
         # 1. Calculate opponent's offensive advantage against our current pokemon
         current_disadvantage = max(
@@ -255,12 +247,13 @@ class SmarterHeuristicAgent(BaseAgent):
         trainer = battle.get_trainer_by_id(trainer_id)
         item = ItemRegistry.get(action.item_id)
         target = trainer.pokemon_team[action.target_index]
+        target: Pokemon
 
         # Only score healing items for now
         if "Potion" not in item.name and "Heal" not in item.name:
             return 0.0
 
-        if target.hp / target.max_hp > self.heal_threshold:
+        if target.hp_ratio > self.heal_threshold:
             return -1.0  # Don't heal if HP is high
 
         # Simplified scoring: base on item name

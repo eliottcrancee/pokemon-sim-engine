@@ -7,9 +7,11 @@ from pokemon.agents import (
     AlphaBetaAgent,
     BaseAgent,
     BestAttackAgent,
+    BestAttackAndPotionAgent,
     InputAgent,
-    MinimaxAgent,
+    OneStepUniformExpectimaxAgent,
     RandomAgent,
+    RandomAttackAgent,
     SmarterHeuristicAgent,
 )
 from pokemon.battle import Battle
@@ -17,13 +19,15 @@ from pokemon.battle_registry import BattleRegistry
 from pokemon.play import play_multiple, play_tournament
 from pokemon.ui import play_ui
 
-AGENT_POOL = {
-    "RandomAgent": lambda: RandomAgent(),
-    "BestAttackAgent": lambda: BestAttackAgent(),
-    "SmarterHeuristicAgent": lambda: SmarterHeuristicAgent(),
-    "MinimaxAgent (d=1)": lambda: MinimaxAgent(depth=1),
-    "AlphaBetaAgent (d=2)": lambda: AlphaBetaAgent(depth=2),
-}
+AGENT_POOL = [
+    RandomAgent(),
+    RandomAttackAgent(),
+    BestAttackAgent(),
+    BestAttackAndPotionAgent(),
+    SmarterHeuristicAgent(),
+    OneStepUniformExpectimaxAgent(),
+    # AlphaBetaAgent(depth=1),
+]
 
 
 def select_from_list(prompt: str, options: list[str]) -> str:
@@ -35,7 +39,7 @@ def select_from_list(prompt: str, options: list[str]) -> str:
         try:
             choice = int(input("> "))
             if 1 <= choice <= len(options):
-                return options[choice - 1]
+                return choice - 1
             else:
                 print("Invalid choice. Please try again.")
         except ValueError:
@@ -44,8 +48,8 @@ def select_from_list(prompt: str, options: list[str]) -> str:
 
 def select_agent(prompt: str) -> "BaseAgent":
     """Lets the user select an agent from the AGENT_POOL."""
-    agent_name = select_from_list(prompt, list(AGENT_POOL.keys()))
-    return AGENT_POOL[agent_name]()
+    agent_index = select_from_list(prompt, AGENT_POOL)
+    return AGENT_POOL[agent_index]
 
 
 def get_battle_description(battle: "Battle") -> str:
@@ -153,10 +157,9 @@ def run_tournament_mode():
             print("Please enter valid numbers.")
 
     print(f"\nStarting tournament for '{battle_name}'...")
-    agent_pool = [factory() for factory in AGENT_POOL.values()]
 
     final_rankings = play_tournament(
-        agent_pool=agent_pool,
+        agent_pool=AGENT_POOL,
         battle=battle,
         n_matches=n_matches,
         n_battles_per_match=n_battles_per_match,

@@ -85,16 +85,16 @@ class Pokemon:
         "species",
         "surname",
         "level",
-        "_ivs",  # array('H') - Unsigned Short
-        "_evs",  # array('H')
+        "_ivs",
+        "_evs",
         "move_slots",
         "_current_hp",
         "_max_hp",
         "_status",
-        "_stat_stages",  # array('b') - Signed Char (-6 to 6)
-        "_raw_stats",  # array('H') - Stats without modifiers
-        "_effective_stats",  # array('H') - Cached stats (Raw * Modifier)
-        "_level_factor",  # float - Pre-calculated damage constant
+        "_stat_stages",
+        "_raw_stats",
+        "_effective_stats",
+        "_level_factor",
         "is_alive",
         "_confused",
         "_confused_turns",

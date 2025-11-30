@@ -15,15 +15,15 @@ class Battle:
         self,
         trainers: tuple[Trainer, Trainer],
         max_rounds: int = 100,
-        headless: bool = True,  # Added headless parameter
+        headless: bool = True,
     ):
         self.trainers = trainers
         self.max_rounds = max_rounds
-        self.round = 0  # Initialize round here, not from parameter
-        self.winner = None  # Initialize winner here, not from parameter
-        self.tie = False  # Initialize tie here, not from parameter
+        self.round = 0
+        self.winner = None
+        self.tie = False
         self.headless = headless
-        self.reset()  # Reset will ensure consistent initial state
+        self.reset()
 
     def copy(self):
         cls = self.__class__
@@ -33,7 +33,7 @@ class Battle:
         new_battle.round = self.round
         new_battle.winner = self.winner
         new_battle.tie = self.tie
-        new_battle.headless = self.headless  # Copy headless state
+        new_battle.headless = self.headless
         return new_battle
 
     def get_trainer_by_id(self, trainer_id: int) -> Trainer:

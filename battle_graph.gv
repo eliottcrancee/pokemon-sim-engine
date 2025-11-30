@@ -1,0 +1,1432 @@
+// Battle Graph
+digraph {
+	rankdir=LR
+	S0 [label="Round 0
+Ash: Pikachu (100/100)
+Gary: Eevee (120/120)" shape=box]
+	S1 [label="Round 1
+Ash: Pikachu (70/100)
+Gary: Eevee (71/120)" shape=box]
+	S0 -> S1 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S2 [label="Round 1
+Ash: Pikachu (69/100)
+Gary: Eevee (71/120)" shape=box]
+	S0 -> S2 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S3 [label="Round 1
+Ash: Pikachu (37/100)
+Gary: Eevee (19/120)" shape=box]
+	S0 -> S3 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S4 [label="Round 1
+Ash: Pikachu (69/100)
+Gary: Eevee (19/120)" shape=box]
+	S0 -> S4 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S5 [label="Round 1
+Ash: Pikachu (67/100)
+Gary: Eevee (71/120)" shape=box]
+	S0 -> S5 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S6 [label="Round 1
+Ash: Pikachu (65/100)
+Gary: Eevee (69/120)" shape=box]
+	S0 -> S6 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S7 [label="Round 1
+Ash: Pikachu (67/100)
+Gary: Eevee (70/120)" shape=box]
+	S0 -> S7 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S8 [label="Round 1
+Ash: Pikachu (66/100)
+Gary: Eevee (72/120)" shape=box]
+	S0 -> S8 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S9 [label="Round 1
+Ash: Pikachu (66/100)
+Gary: Eevee (19/120)" shape=box]
+	S0 -> S9 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S10 [label="Round 1
+Ash: Pikachu (68/100)
+Gary: Eevee (72/120)" shape=box]
+	S0 -> S10 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S11 [label="Round 1
+Ash: Pikachu (72/100)
+Gary: Eevee (102/120)" shape=box]
+	S0 -> S11 [label="Atk(1) vs Atk(0)
+P=0.4" fontsize=10]
+	S12 [label="Round 1
+Ash: Pikachu (68/100)
+Gary: Eevee (102/120)" shape=box]
+	S0 -> S12 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S13 [label="Round 1
+Ash: Pikachu (71/100)
+Gary: Eevee (101/120)" shape=box]
+	S0 -> S13 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S14 [label="Round 1
+Ash: Pikachu (68/100)
+Gary: Eevee (100/120)" shape=box]
+	S0 -> S14 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S15 [label="Round 1
+Ash: Pikachu (30/100)
+Gary: Eevee (101/120)" shape=box]
+	S0 -> S15 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S16 [label="Round 1
+Ash: Pikachu (65/100)
+Gary: Eevee (102/120)" shape=box]
+	S0 -> S16 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S17 [label="Round 1
+Ash: Pikachu (68/100)
+Gary: Eevee (101/120)" shape=box]
+	S0 -> S17 [label="Atk(1) vs Atk(1)
+P=0.4" fontsize=10]
+	S18 [label="Round 1
+Ash: Pikachu (66/100)
+Gary: Eevee (101/120)" shape=box]
+	S0 -> S18 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S19 [label="Round 2
+Ash: Pikachu (41/100)
+Gary: Eevee (26/120)" shape=box]
+	S1 -> S19 [label="Atk(0) vs Atk(0)
+P=0.4" fontsize=10]
+	S20 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (24/120)" shape=box]
+	S1 -> S20 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S21 [label="Round 2
+Ash: Pikachu (41/100)
+Gary: Eevee (22/120)" shape=box]
+	S1 -> S21 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S22 [label="Round 2
+Ash: Pikachu (40/100)
+Gary: Eevee (21/120)" shape=box]
+	S1 -> S22 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S23 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (20/120)" shape=box]
+	S1 -> S23 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S24 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (25/120)" shape=box]
+	S1 -> S24 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S25 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (24/120)" shape=box]
+	S1 -> S25 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S26 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (25/120)" shape=box]
+	S1 -> S26 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S27 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (19/120)" shape=box]
+	S1 -> S27 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S28 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (52/120)" shape=box]
+	S1 -> S28 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S29 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (52/120)" shape=box]
+	S1 -> S29 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S30 [label="Round 2
+Ash: Pikachu (41/100)
+Gary: Eevee (52/120)" shape=box]
+	S1 -> S30 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S31 [label="Round 2
+Ash: Pikachu (42/100)
+Gary: Eevee (53/120)" shape=box]
+	S1 -> S31 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S32 [label="Round 2
+Ash: Pikachu (70/100)
+Gary: Eevee (51/120)" shape=box]
+	S1 -> S32 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S33 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (53/120)" shape=box]
+	S1 -> S33 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S34 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (52/120)" shape=box]
+	S1 -> S34 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S35 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (53/120)" shape=box]
+	S1 -> S35 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S36 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (36/120)" shape=box]
+	S1 -> S36 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S37 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (52/120)" shape=box]
+	S1 -> S37 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S38 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (20/120)" shape=box]
+	S2 -> S38 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S39 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (25/120)" shape=box]
+	S2 -> S39 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S2 -> S21 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S40 [label="Round 2
+Ash: Pikachu (41/100)
+Gary: Eevee (20/120)" shape=box]
+	S2 -> S40 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S41 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (24/120)" shape=box]
+	S2 -> S41 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S42 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (23/120)" shape=box]
+	S2 -> S42 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S43 [label="Round 2
+Ash: Pikachu (69/100)
+Gary: Eevee (0/120)
+Winner: Ash" fillcolor=lightblue style=filled]
+	S2 -> S43 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S44 [label="Round 2
+Ash: Pikachu (34/100)
+Gary: Eevee (21/120)" shape=box]
+	S2 -> S44 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S45 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (23/120)" shape=box]
+	S2 -> S45 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S46 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (19/120)" shape=box]
+	S2 -> S46 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S2 -> S29 [label="Atk(1) vs Atk(0)
+P=0.4" fontsize=10]
+	S47 [label="Round 2
+Ash: Pikachu (40/100)
+Gary: Eevee (52/120)" shape=box]
+	S2 -> S47 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S2 -> S30 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S48 [label="Round 2
+Ash: Pikachu (69/100)
+Gary: Eevee (51/120)" shape=box]
+	S2 -> S48 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S49 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (35/120)" shape=box]
+	S2 -> S49 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S50 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (51/120)" shape=box]
+	S2 -> S50 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S2 -> S37 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S51 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (53/120)" shape=box]
+	S2 -> S51 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S52 [label="Round 2
+Ash: Pikachu (34/100)
+Gary: Eevee (51/120)" shape=box]
+	S2 -> S52 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S53 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (0/120)
+Winner: Ash" fillcolor=lightblue style=filled]
+	S3 -> S53 [label="Atk(0) vs Atk(0)
+P=1.0" fontsize=10]
+	S3 -> S53 [label="Atk(0) vs Atk(1)
+P=1.0" fontsize=10]
+	S54 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (0/120)
+Winner: Ash" fillcolor=lightblue style=filled]
+	S3 -> S54 [label="Atk(1) vs Atk(0)
+P=0.8" fontsize=10]
+	S55 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (1/120)" shape=box]
+	S3 -> S55 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S56 [label="Round 2
+Ash: Pikachu (1/100)
+Gary: Eevee (1/120)" shape=box]
+	S3 -> S56 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S3 -> S54 [label="Atk(1) vs Atk(1)
+P=0.4" fontsize=10]
+	S57 [label="Round 2
+Ash: Pikachu (4/100)
+Gary: Eevee (1/120)" shape=box]
+	S3 -> S57 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S58 [label="Round 2
+Ash: Pikachu (5/100)
+Gary: Eevee (1/120)" shape=box]
+	S3 -> S58 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S4 -> S43 [label="Atk(0) vs Atk(0)
+P=1.0" fontsize=10]
+	S4 -> S43 [label="Atk(0) vs Atk(1)
+P=1.0" fontsize=10]
+	S59 [label="Round 2
+Ash: Pikachu (69/100)
+Gary: Eevee (0/120)
+Winner: Ash" fillcolor=lightblue style=filled]
+	S4 -> S59 [label="Atk(1) vs Atk(0)
+P=1.0" fontsize=10]
+	S60 [label="Round 2
+Ash: Pikachu (34/100)
+Gary: Eevee (1/120)" shape=box]
+	S4 -> S60 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S4 -> S59 [label="Atk(1) vs Atk(1)
+P=0.4" fontsize=10]
+	S61 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (1/120)" shape=box]
+	S4 -> S61 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S62 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (1/120)" shape=box]
+	S4 -> S62 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S63 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (21/120)" shape=box]
+	S5 -> S63 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S5 -> S39 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S64 [label="Round 2
+Ash: Pikachu (67/100)
+Gary: Eevee (20/120)" shape=box]
+	S5 -> S64 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S65 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (21/120)" shape=box]
+	S5 -> S65 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S66 [label="Round 2
+Ash: Pikachu (67/100)
+Gary: Eevee (21/120)" shape=box]
+	S5 -> S66 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S67 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (22/120)" shape=box]
+	S5 -> S67 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S68 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (22/120)" shape=box]
+	S5 -> S68 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S69 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (23/120)" shape=box]
+	S5 -> S69 [label="Atk(0) vs Atk(1)
+P=0.4" fontsize=10]
+	S5 -> S24 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S70 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (50/120)" shape=box]
+	S5 -> S70 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S71 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (53/120)" shape=box]
+	S5 -> S71 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S72 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (52/120)" shape=box]
+	S5 -> S72 [label="Atk(1) vs Atk(0)
+P=0.4" fontsize=10]
+	S73 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (53/120)" shape=box]
+	S5 -> S73 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S74 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (52/120)" shape=box]
+	S5 -> S74 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S5 -> S51 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S75 [label="Round 2
+Ash: Pikachu (32/100)
+Gary: Eevee (51/120)" shape=box]
+	S5 -> S75 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S76 [label="Round 2
+Ash: Pikachu (34/100)
+Gary: Eevee (53/120)" shape=box]
+	S5 -> S76 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S77 [label="Round 2
+Ash: Pikachu (34/100)
+Gary: Eevee (52/120)" shape=box]
+	S5 -> S77 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S78 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (20/120)" shape=box]
+	S6 -> S78 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S79 [label="Round 2
+Ash: Pikachu (65/100)
+Gary: Eevee (0/120)
+Winner: Ash" fillcolor=lightblue style=filled]
+	S6 -> S79 [label="Atk(0) vs Atk(0)
+P=0.6" fontsize=10]
+	S80 [label="Round 2
+Ash: Pikachu (65/100)
+Gary: Eevee (19/120)" shape=box]
+	S6 -> S80 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S81 [label="Round 2
+Ash: Pikachu (0/100)
+Gary: Eevee (21/120)
+Winner: Gary" fillcolor=lightpink style=filled]
+	S6 -> S81 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S82 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (17/120)" shape=box]
+	S6 -> S82 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S83 [label="Round 2
+Ash: Pikachu (29/100)
+Gary: Eevee (24/120)" shape=box]
+	S6 -> S83 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S84 [label="Round 2
+Ash: Pikachu (29/100)
+Gary: Eevee (19/120)" shape=box]
+	S6 -> S84 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S85 [label="Round 2
+Ash: Pikachu (32/100)
+Gary: Eevee (21/120)" shape=box]
+	S6 -> S85 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S86 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (50/120)" shape=box]
+	S6 -> S86 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S87 [label="Round 2
+Ash: Pikachu (6/100)
+Gary: Eevee (50/120)" shape=box]
+	S6 -> S87 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S88 [label="Round 2
+Ash: Pikachu (9/100)
+Gary: Eevee (51/120)" shape=box]
+	S6 -> S88 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S89 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (51/120)" shape=box]
+	S6 -> S89 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S90 [label="Round 2
+Ash: Pikachu (65/100)
+Gary: Eevee (51/120)" shape=box]
+	S6 -> S90 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S91 [label="Round 2
+Ash: Pikachu (30/100)
+Gary: Eevee (49/120)" shape=box]
+	S6 -> S91 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S92 [label="Round 2
+Ash: Pikachu (31/100)
+Gary: Eevee (50/120)" shape=box]
+	S6 -> S92 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S93 [label="Round 2
+Ash: Pikachu (34/100)
+Gary: Eevee (50/120)" shape=box]
+	S6 -> S93 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S94 [label="Round 2
+Ash: Pikachu (34/100)
+Gary: Eevee (49/120)" shape=box]
+	S6 -> S94 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S95 [label="Round 2
+Ash: Pikachu (31/100)
+Gary: Eevee (48/120)" shape=box]
+	S6 -> S95 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S96 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (20/120)" shape=box]
+	S7 -> S96 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S97 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (24/120)" shape=box]
+	S7 -> S97 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S98 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (18/120)" shape=box]
+	S7 -> S98 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S99 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (22/120)" shape=box]
+	S7 -> S99 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S7 -> S23 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S100 [label="Round 2
+Ash: Pikachu (32/100)
+Gary: Eevee (22/120)" shape=box]
+	S7 -> S100 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S101 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (20/120)" shape=box]
+	S7 -> S101 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S102 [label="Round 2
+Ash: Pikachu (32/100)
+Gary: Eevee (25/120)" shape=box]
+	S7 -> S102 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S103 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (25/120)" shape=box]
+	S7 -> S103 [label="Atk(0) vs Atk(1)
+P=0.4" fontsize=10]
+	S104 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (52/120)" shape=box]
+	S7 -> S104 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S105 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (50/120)" shape=box]
+	S7 -> S105 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S7 -> S37 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S106 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (50/120)" shape=box]
+	S7 -> S106 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S7 -> S34 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S107 [label="Round 2
+Ash: Pikachu (32/100)
+Gary: Eevee (52/120)" shape=box]
+	S7 -> S107 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S108 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (50/120)" shape=box]
+	S7 -> S108 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S109 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (52/120)" shape=box]
+	S7 -> S109 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S110 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (51/120)" shape=box]
+	S7 -> S110 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S111 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (34/120)" shape=box]
+	S7 -> S111 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S112 [label="Round 2
+Ash: Pikachu (2/100)
+Gary: Eevee (23/120)" shape=box]
+	S8 -> S112 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S113 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (21/120)" shape=box]
+	S8 -> S113 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S114 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (24/120)" shape=box]
+	S8 -> S114 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S115 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (22/120)" shape=box]
+	S8 -> S115 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S8 -> S45 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S116 [label="Round 2
+Ash: Pikachu (34/100)
+Gary: Eevee (21/120)" shape=box]
+	S8 -> S116 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S117 [label="Round 2
+Ash: Pikachu (34/100)
+Gary: Eevee (27/120)" shape=box]
+	S8 -> S117 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S118 [label="Round 2
+Ash: Pikachu (30/100)
+Gary: Eevee (21/120)" shape=box]
+	S8 -> S118 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S119 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (26/120)" shape=box]
+	S8 -> S119 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S120 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (22/120)" shape=box]
+	S8 -> S120 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S121 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (54/120)" shape=box]
+	S8 -> S121 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S122 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (52/120)" shape=box]
+	S8 -> S122 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S123 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (55/120)" shape=box]
+	S8 -> S123 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S124 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (54/120)" shape=box]
+	S8 -> S124 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S125 [label="Round 2
+Ash: Pikachu (4/100)
+Gary: Eevee (52/120)" shape=box]
+	S8 -> S125 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S126 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (52/120)" shape=box]
+	S8 -> S126 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S127 [label="Round 2
+Ash: Pikachu (31/100)
+Gary: Eevee (54/120)" shape=box]
+	S8 -> S127 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S128 [label="Round 2
+Ash: Pikachu (34/100)
+Gary: Eevee (52/120)" shape=box]
+	S8 -> S128 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S8 -> S107 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S129 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (54/120)" shape=box]
+	S8 -> S129 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S130 [label="Round 2
+Ash: Pikachu (66/100)
+Gary: Eevee (0/120)
+Winner: Ash" fillcolor=lightblue style=filled]
+	S9 -> S130 [label="Atk(0) vs Atk(0)
+P=1.0" fontsize=10]
+	S9 -> S130 [label="Atk(0) vs Atk(1)
+P=1.0" fontsize=10]
+	S131 [label="Round 2
+Ash: Pikachu (66/100)
+Gary: Eevee (0/120)
+Winner: Ash" fillcolor=lightblue style=filled]
+	S9 -> S131 [label="Atk(1) vs Atk(0)
+P=0.6" fontsize=10]
+	S132 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (1/120)" shape=box]
+	S9 -> S132 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S9 -> S60 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S9 -> S131 [label="Atk(1) vs Atk(1)
+P=0.8" fontsize=10]
+	S133 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (1/120)" shape=box]
+	S9 -> S133 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S134 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (22/120)" shape=box]
+	S10 -> S134 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S135 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (20/120)" shape=box]
+	S10 -> S135 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S10 -> S114 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S10 -> S26 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S136 [label="Round 2
+Ash: Pikachu (40/100)
+Gary: Eevee (25/120)" shape=box]
+	S10 -> S136 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S10 -> S116 [label="Atk(0) vs Atk(1)
+P=0.4" fontsize=10]
+	S137 [label="Round 2
+Ash: Pikachu (34/100)
+Gary: Eevee (20/120)" shape=box]
+	S10 -> S137 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S138 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (26/120)" shape=box]
+	S10 -> S138 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S139 [label="Round 2
+Ash: Pikachu (32/100)
+Gary: Eevee (23/120)" shape=box]
+	S10 -> S139 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S140 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (54/120)" shape=box]
+	S10 -> S140 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S10 -> S124 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S10 -> S74 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S141 [label="Round 2
+Ash: Pikachu (40/100)
+Gary: Eevee (36/120)" shape=box]
+	S10 -> S141 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S142 [label="Round 2
+Ash: Pikachu (40/100)
+Gary: Eevee (53/120)" shape=box]
+	S10 -> S142 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S143 [label="Round 2
+Ash: Pikachu (32/100)
+Gary: Eevee (35/120)" shape=box]
+	S10 -> S143 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S10 -> S109 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S144 [label="Round 2
+Ash: Pikachu (1/100)
+Gary: Eevee (53/120)" shape=box]
+	S10 -> S144 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S145 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (54/120)" shape=box]
+	S10 -> S145 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S146 [label="Round 2
+Ash: Pikachu (32/100)
+Gary: Eevee (53/120)" shape=box]
+	S10 -> S146 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S147 [label="Round 2
+Ash: Pikachu (41/100)
+Gary: Eevee (50/120)" shape=box]
+	S11 -> S147 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S148 [label="Round 2
+Ash: Pikachu (7/100)
+Gary: Eevee (51/120)" shape=box]
+	S11 -> S148 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S149 [label="Round 2
+Ash: Pikachu (40/100)
+Gary: Eevee (50/120)" shape=box]
+	S11 -> S149 [label="Atk(0) vs Atk(0)
+P=0.4" fontsize=10]
+	S150 [label="Round 2
+Ash: Pikachu (40/100)
+Gary: Eevee (55/120)" shape=box]
+	S11 -> S150 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S11 -> S50 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S151 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (9/120)" shape=box]
+	S11 -> S151 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S152 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (55/120)" shape=box]
+	S11 -> S152 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S153 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (55/120)" shape=box]
+	S11 -> S153 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S154 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (51/120)" shape=box]
+	S11 -> S154 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S155 [label="Round 2
+Ash: Pikachu (40/100)
+Gary: Eevee (84/120)" shape=box]
+	S11 -> S155 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S156 [label="Round 2
+Ash: Pikachu (41/100)
+Gary: Eevee (83/120)" shape=box]
+	S11 -> S156 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S157 [label="Round 2
+Ash: Pikachu (41/100)
+Gary: Eevee (84/120)" shape=box]
+	S11 -> S157 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S158 [label="Round 2
+Ash: Pikachu (42/100)
+Gary: Eevee (84/120)" shape=box]
+	S11 -> S158 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S159 [label="Round 2
+Ash: Pikachu (41/100)
+Gary: Eevee (82/120)" shape=box]
+	S11 -> S159 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S160 [label="Round 2
+Ash: Pikachu (10/100)
+Gary: Eevee (82/120)" shape=box]
+	S11 -> S160 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S161 [label="Round 2
+Ash: Pikachu (41/100)
+Gary: Eevee (82/120)" shape=box]
+	S11 -> S161 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S162 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (84/120)" shape=box]
+	S11 -> S162 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S163 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (83/120)" shape=box]
+	S11 -> S163 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S164 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (82/120)" shape=box]
+	S11 -> S164 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S12 -> S70 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S165 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (51/120)" shape=box]
+	S12 -> S165 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S166 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (50/120)" shape=box]
+	S12 -> S166 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S167 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (53/120)" shape=box]
+	S12 -> S167 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S168 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (55/120)" shape=box]
+	S12 -> S168 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S169 [label="Round 2
+Ash: Pikachu (1/100)
+Gary: Eevee (56/120)" shape=box]
+	S12 -> S169 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S12 -> S34 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S170 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (56/120)" shape=box]
+	S12 -> S170 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S171 [label="Round 2
+Ash: Pikachu (34/100)
+Gary: Eevee (56/120)" shape=box]
+	S12 -> S171 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S172 [label="Round 2
+Ash: Pikachu (0/100)
+Gary: Eevee (53/120)
+Winner: Gary" fillcolor=lightpink style=filled]
+	S12 -> S172 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S173 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (83/120)" shape=box]
+	S12 -> S173 [label="Atk(1) vs Atk(0)
+P=0.4" fontsize=10]
+	S174 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (84/120)" shape=box]
+	S12 -> S174 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S175 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (83/120)" shape=box]
+	S12 -> S175 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S176 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (82/120)" shape=box]
+	S12 -> S176 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S177 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (82/120)" shape=box]
+	S12 -> S177 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S178 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (82/120)" shape=box]
+	S12 -> S178 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S179 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (83/120)" shape=box]
+	S12 -> S179 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S180 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (83/120)" shape=box]
+	S12 -> S180 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S181 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (83/120)" shape=box]
+	S12 -> S181 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S182 [label="Round 2
+Ash: Pikachu (41/100)
+Gary: Eevee (56/120)" shape=box]
+	S13 -> S182 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S183 [label="Round 2
+Ash: Pikachu (43/100)
+Gary: Eevee (55/120)" shape=box]
+	S13 -> S183 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S184 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (49/120)" shape=box]
+	S13 -> S184 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S185 [label="Round 2
+Ash: Pikachu (43/100)
+Gary: Eevee (54/120)" shape=box]
+	S13 -> S185 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S186 [label="Round 2
+Ash: Pikachu (40/100)
+Gary: Eevee (54/120)" shape=box]
+	S13 -> S186 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S13 -> S153 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S13 -> S37 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S187 [label="Round 2
+Ash: Pikachu (40/100)
+Gary: Eevee (3/120)" shape=box]
+	S13 -> S187 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S188 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (50/120)" shape=box]
+	S13 -> S188 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S13 -> S140 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S189 [label="Round 2
+Ash: Pikachu (40/100)
+Gary: Eevee (83/120)" shape=box]
+	S13 -> S189 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S190 [label="Round 2
+Ash: Pikachu (42/100)
+Gary: Eevee (83/120)" shape=box]
+	S13 -> S190 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S191 [label="Round 2
+Ash: Pikachu (13/100)
+Gary: Eevee (82/120)" shape=box]
+	S13 -> S191 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S192 [label="Round 2
+Ash: Pikachu (71/100)
+Gary: Eevee (61/120)" shape=box]
+	S13 -> S192 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S13 -> S176 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S13 -> S163 [label="Atk(1) vs Atk(1)
+P=0.4" fontsize=10]
+	S193 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (81/120)" shape=box]
+	S13 -> S193 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S194 [label="Round 2
+Ash: Pikachu (40/100)
+Gary: Eevee (83/120)" shape=box]
+	S13 -> S194 [label="Atk(1) vs Atk(1)
+P=0.4" fontsize=10]
+	S14 -> S47 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S195 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (9/120)" shape=box]
+	S14 -> S195 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S196 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (55/120)" shape=box]
+	S14 -> S196 [label="Atk(0) vs Atk(0)
+P=0.4" fontsize=10]
+	S197 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (48/120)" shape=box]
+	S14 -> S197 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S14 -> S37 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S198 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (9/120)" shape=box]
+	S14 -> S198 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S14 -> S33 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S199 [label="Round 2
+Ash: Pikachu (3/100)
+Gary: Eevee (51/120)" shape=box]
+	S14 -> S199 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S200 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (53/120)" shape=box]
+	S14 -> S200 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S201 [label="Round 2
+Ash: Pikachu (68/100)
+Gary: Eevee (83/120)" shape=box]
+	S14 -> S201 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S202 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (80/120)" shape=box]
+	S14 -> S202 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S203 [label="Round 2
+Ash: Pikachu (40/100)
+Gary: Eevee (82/120)" shape=box]
+	S14 -> S203 [label="Atk(1) vs Atk(0)
+P=0.4" fontsize=10]
+	S204 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (81/120)" shape=box]
+	S14 -> S204 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S205 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (80/120)" shape=box]
+	S14 -> S205 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S206 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (80/120)" shape=box]
+	S14 -> S206 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S207 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (59/120)" shape=box]
+	S14 -> S207 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S14 -> S193 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S208 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (79/120)" shape=box]
+	S14 -> S208 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S209 [label="Round 2
+Ash: Pikachu (1/100)
+Gary: Eevee (54/120)" shape=box]
+	S15 -> S209 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S210 [label="Round 2
+Ash: Pikachu (0/100)
+Gary: Eevee (50/120)
+Winner: Gary" fillcolor=lightpink style=filled]
+	S15 -> S210 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S211 [label="Round 2
+Ash: Pikachu (2/100)
+Gary: Eevee (53/120)" shape=box]
+	S15 -> S211 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S212 [label="Round 2
+Ash: Pikachu (0/100)
+Gary: Eevee (54/120)
+Winner: Gary" fillcolor=lightpink style=filled]
+	S15 -> S212 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S213 [label="Round 2
+Ash: Pikachu (0/100)
+Gary: Eevee (49/120)
+Winner: Gary" fillcolor=lightpink style=filled]
+	S15 -> S213 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S214 [label="Round 2
+Ash: Pikachu (0/100)
+Gary: Eevee (51/120)
+Winner: Gary" fillcolor=lightpink style=filled]
+	S15 -> S214 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S215 [label="Round 2
+Ash: Pikachu (0/100)
+Gary: Eevee (50/120)
+Winner: Gary" fillcolor=lightpink style=filled]
+	S15 -> S215 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S216 [label="Round 2
+Ash: Pikachu (0/100)
+Gary: Eevee (55/120)
+Winner: Gary" fillcolor=lightpink style=filled]
+	S15 -> S216 [label="Atk(0) vs Atk(1)
+P=0.6" fontsize=10]
+	S217 [label="Round 2
+Ash: Pikachu (1/100)
+Gary: Eevee (82/120)" shape=box]
+	S15 -> S217 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S218 [label="Round 2
+Ash: Pikachu (1/100)
+Gary: Eevee (81/120)" shape=box]
+	S15 -> S218 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S219 [label="Round 2
+Ash: Pikachu (0/100)
+Gary: Eevee (81/120)
+Winner: Gary" fillcolor=lightpink style=filled]
+	S15 -> S219 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S220 [label="Round 2
+Ash: Pikachu (0/100)
+Gary: Eevee (62/120)
+Winner: Gary" fillcolor=lightpink style=filled]
+	S15 -> S220 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S221 [label="Round 2
+Ash: Pikachu (0/100)
+Gary: Eevee (82/120)
+Winner: Gary" fillcolor=lightpink style=filled]
+	S15 -> S221 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S222 [label="Round 2
+Ash: Pikachu (0/100)
+Gary: Eevee (80/120)
+Winner: Gary" fillcolor=lightpink style=filled]
+	S15 -> S222 [label="Atk(1) vs Atk(1)
+P=0.4" fontsize=10]
+	S223 [label="Round 2
+Ash: Pikachu (0/100)
+Gary: Eevee (83/120)
+Winner: Gary" fillcolor=lightpink style=filled]
+	S15 -> S223 [label="Atk(1) vs Atk(1)
+P=0.4" fontsize=10]
+	S224 [label="Round 2
+Ash: Pikachu (0/100)
+Gary: Eevee (81/120)
+Winner: Gary" fillcolor=lightpink style=filled]
+	S15 -> S224 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S225 [label="Round 2
+Ash: Pikachu (34/100)
+Gary: Eevee (49/120)" shape=box]
+	S16 -> S225 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S226 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (57/120)" shape=box]
+	S16 -> S226 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S227 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (56/120)" shape=box]
+	S16 -> S227 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S16 -> S34 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S228 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (53/120)" shape=box]
+	S16 -> S228 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S229 [label="Round 2
+Ash: Pikachu (0/100)
+Gary: Eevee (52/120)
+Winner: Gary" fillcolor=lightpink style=filled]
+	S16 -> S229 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S16 -> S91 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S230 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (52/120)" shape=box]
+	S16 -> S230 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S231 [label="Round 2
+Ash: Pikachu (34/100)
+Gary: Eevee (51/120)" shape=box]
+	S16 -> S231 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S232 [label="Round 2
+Ash: Pikachu (29/100)
+Gary: Eevee (57/120)" shape=box]
+	S16 -> S232 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S233 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (61/120)" shape=box]
+	S16 -> S233 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S234 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (82/120)" shape=box]
+	S16 -> S234 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S235 [label="Round 2
+Ash: Pikachu (36/100)
+Gary: Eevee (82/120)" shape=box]
+	S16 -> S235 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S236 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (84/120)" shape=box]
+	S16 -> S236 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S16 -> S177 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S237 [label="Round 2
+Ash: Pikachu (32/100)
+Gary: Eevee (84/120)" shape=box]
+	S16 -> S237 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S238 [label="Round 2
+Ash: Pikachu (32/100)
+Gary: Eevee (82/120)" shape=box]
+	S16 -> S238 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S16 -> S223 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S239 [label="Round 2
+Ash: Pikachu (1/100)
+Gary: Eevee (83/120)" shape=box]
+	S16 -> S239 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S240 [label="Round 2
+Ash: Pikachu (32/100)
+Gary: Eevee (83/120)" shape=box]
+	S16 -> S240 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S17 -> S153 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S17 -> S33 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S17 -> S140 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S17 -> S50 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S17 -> S152 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S17 -> S126 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S241 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (49/120)" shape=box]
+	S17 -> S241 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S242 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (53/120)" shape=box]
+	S17 -> S242 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S243 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (54/120)" shape=box]
+	S17 -> S243 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S244 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (56/120)" shape=box]
+	S17 -> S244 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S245 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (83/120)" shape=box]
+	S17 -> S245 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S246 [label="Round 2
+Ash: Pikachu (39/100)
+Gary: Eevee (82/120)" shape=box]
+	S17 -> S246 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S17 -> S194 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S17 -> S235 [label="Atk(1) vs Atk(0)
+P=0.4" fontsize=10]
+	S247 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (83/120)" shape=box]
+	S17 -> S247 [label="Atk(1) vs Atk(1)
+P=0.4" fontsize=10]
+	S17 -> S238 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S17 -> S240 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S248 [label="Round 2
+Ash: Pikachu (32/100)
+Gary: Eevee (81/120)" shape=box]
+	S17 -> S248 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S18 -> S153 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S18 -> S86 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S249 [label="Round 2
+Ash: Pikachu (37/100)
+Gary: Eevee (49/120)" shape=box]
+	S18 -> S249 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S18 -> S228 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S250 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (49/120)" shape=box]
+	S18 -> S250 [label="Atk(0) vs Atk(0)
+P=0.2" fontsize=10]
+	S18 -> S231 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S251 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (49/120)" shape=box]
+	S18 -> S251 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S18 -> S146 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S18 -> S128 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S18 -> S107 [label="Atk(0) vs Atk(1)
+P=0.2" fontsize=10]
+	S18 -> S180 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S18 -> S235 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S252 [label="Round 2
+Ash: Pikachu (38/100)
+Gary: Eevee (65/120)" shape=box]
+	S18 -> S252 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S18 -> S163 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S18 -> S206 [label="Atk(1) vs Atk(0)
+P=0.2" fontsize=10]
+	S253 [label="Round 2
+Ash: Pikachu (35/100)
+Gary: Eevee (82/120)" shape=box]
+	S18 -> S253 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S254 [label="Round 2
+Ash: Pikachu (31/100)
+Gary: Eevee (83/120)" shape=box]
+	S18 -> S254 [label="Atk(1) vs Atk(1)
+P=0.4" fontsize=10]
+	S18 -> S240 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+	S255 [label="Round 2
+Ash: Pikachu (33/100)
+Gary: Eevee (82/120)" shape=box]
+	S18 -> S255 [label="Atk(1) vs Atk(1)
+P=0.2" fontsize=10]
+}

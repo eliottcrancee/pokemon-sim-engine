@@ -84,7 +84,7 @@ def _calculate_base_damage(
 
     is_critical = random.random() < 0.0625
     if is_critical:
-        multiplier *= 1.5
+        multiplier *= 2.0
 
     if stab:
         multiplier *= 1.5

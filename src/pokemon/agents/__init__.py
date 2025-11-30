@@ -1,4 +1,4 @@
-from .base_agent import BaseAgent, EvaluatingAgent
+from .base_agent import BaseAgent
 from .heuristic import (
     BestAttackAgent,
     BestAttackAndPotionAgent,
@@ -17,7 +17,6 @@ from .simple import FirstAgent, InputAgent, RandomAgent, RandomAttackAgent
 
 __all__ = [
     "BaseAgent",
-    "EvaluatingAgent",
     "BestAttackAgent",
     "BestAttackAndPotionAgent",
     "RandomAttackAndPotionAgent",

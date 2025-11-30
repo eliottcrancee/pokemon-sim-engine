@@ -4,18 +4,20 @@
 import math
 import random
 import time
+from typing import Callable, Optional
 
 import numpy as np
 from joblib import Parallel, delayed
 
 from pokemon.action import Action, ActionType
+from pokemon.agents.evaluation import standard_evaluation
 from pokemon.battle import Battle
 from pokemon.loguru_logger import logger
 
-from .base_agent import EvaluatingAgent
+from .base_agent import BaseAgent
 
 
-class OneStepUniformExpectimaxAgent(EvaluatingAgent):
+class OneStepUniformExpectimaxAgent(BaseAgent):
     """Agent that evaluates actions by simulating one turn ahead.
     Uses a heuristic to score the resulting battle state after one turn.
     The action with the highest average score against all opponent responses
@@ -23,14 +25,19 @@ class OneStepUniformExpectimaxAgent(EvaluatingAgent):
     """
 
     def __init__(
-        self, name: str = "OneStepUniformExpectimax", parallelize: bool = False
+        self,
+        name: str = "OneStepUniformExpectimax",
+        parallelize: bool = False,
+        evaluation_func: Optional[Callable[[Battle, int], float]] = None,
     ):
         """Initialize the agent.
         Args:
             name: The name of the agent.
+            evaluation_func: Custom evaluation function.
         """
         super().__init__(name)
         self.parallelize = parallelize
+        self.evaluation_func = evaluation_func or standard_evaluation
 
     def _calculate_action_score(
         self,
@@ -53,7 +60,7 @@ class OneStepUniformExpectimaxAgent(EvaluatingAgent):
             else:
                 sim_battle.turn(a1, a0)
 
-            score += self._evaluate_battle(sim_battle, trainer_id)
+            score += self.evaluation_func(sim_battle, trainer_id)
 
             if verbose:
                 logger.info(f"Action: {a0}, Opponent Action: {a1}, Score: {score}")
@@ -101,21 +108,27 @@ class OneStepUniformExpectimaxAgent(EvaluatingAgent):
         return my_actions[best_index]
 
 
-class MinimaxAgent(EvaluatingAgent):
+class MinimaxAgent(BaseAgent):
     """Minimax agent for Pokemon battles."""
 
     def __init__(
-        self, name: str = "Minimax", depth: int = 1, parallelize: bool = False
+        self,
+        name: str = "Minimax",
+        depth: int = 1,
+        parallelize: bool = False,
+        evaluation_func: Optional[Callable[[Battle, int], float]] = None,
     ):
         """Initialize the agent.
         Args:
             name: The name of the agent.
             depth: The search depth for the Minimax algorithm.
+            evaluation_func: Custom evaluation function.
         """
         name = f"{name}(d={depth})"
         super().__init__(name)
         self.depth = depth
         self.parallelize = parallelize
+        self.evaluation_func = evaluation_func or standard_evaluation
 
     def _evaluate_minimax_action(
         self,
@@ -147,7 +160,7 @@ class MinimaxAgent(EvaluatingAgent):
     def _minimax(self, battle: Battle, trainer_id: int, current_depth: int) -> float:
         """Recursive minimax evaluation."""
         if current_depth == 0 or battle.winner is not None:
-            return self._evaluate_battle(battle, trainer_id)
+            return self.evaluation_func(battle, trainer_id)
 
         my_actions = battle.get_possible_actions(trainer_id)
         op_actions = battle.get_possible_actions(1 - trainer_id)
@@ -221,21 +234,27 @@ class MinimaxAgent(EvaluatingAgent):
         return f"{self.__class__.__name__}(name='{self.name}', depth={self.depth})"
 
 
-class AlphaBetaAgent(EvaluatingAgent):
+class AlphaBetaAgent(BaseAgent):
     """Minimax agent with Alpha-Beta pruning for Pokemon battles."""
 
     def __init__(
-        self, name: str = "AlphaBeta", depth: int = 2, parallelize: bool = False
+        self,
+        name: str = "AlphaBeta",
+        depth: int = 2,
+        parallelize: bool = False,
+        evaluation_func: Optional[Callable[[Battle, int], float]] = None,
     ):
         """Initialize the agent.
         Args:
             name: The name of the agent.
             depth: The search depth.
+            evaluation_func: Custom evaluation function.
         """
         name = f"{name}(d={depth})"
         super().__init__(name)
         self.depth = depth
         self.parallelize = parallelize
+        self.evaluation_func = evaluation_func or standard_evaluation
 
     def _evaluate_alphabeta_action(
         self,
@@ -257,13 +276,13 @@ class AlphaBetaAgent(EvaluatingAgent):
     ) -> float:
         """Maximizer node: Tries to maximize the score."""
         if depth == 0 or battle.winner is not None:
-            return self._evaluate_battle(battle, trainer_id)
+            return self.evaluation_func(battle, trainer_id)
 
         value = -float("inf")
         my_actions = battle.get_possible_actions(trainer_id)
 
         if not my_actions:
-            return self._evaluate_battle(battle, trainer_id)
+            return self.evaluation_func(battle, trainer_id)
 
         for action in my_actions:
             v = self._get_min_value(battle, action, trainer_id, depth, alpha, beta)
@@ -287,7 +306,7 @@ class AlphaBetaAgent(EvaluatingAgent):
         op_actions = battle.get_possible_actions(1 - trainer_id)
 
         if not op_actions:
-            return self._evaluate_battle(battle, trainer_id)
+            return self.evaluation_func(battle, trainer_id)
 
         for op_action in op_actions:
             sim_battle = battle.copy()
@@ -359,7 +378,7 @@ class AlphaBetaAgent(EvaluatingAgent):
         return f"{self.__class__.__name__}(name='{self.name}', depth={self.depth})"
 
 
-class MonteCarloExpectiminimaxAgent(EvaluatingAgent):
+class MonteCarloExpectiminimaxAgent(BaseAgent):
     """
     An agent that handles the randomness of Pokemon battles by simulating
     the same turn multiple times (Monte Carlo sampling) to calculate an
@@ -372,6 +391,7 @@ class MonteCarloExpectiminimaxAgent(EvaluatingAgent):
         depth: int = 1,
         num_simulations: int = 20,
         parallelize: bool = False,
+        evaluation_func: Optional[Callable[[Battle, int], float]] = None,
     ):
         """
         Args:
@@ -380,12 +400,14 @@ class MonteCarloExpectiminimaxAgent(EvaluatingAgent):
             num_simulations: How many times to simulate the randomness of a single turn.
                              Higher = more accurate but slower.
             parallelize: Whether to use multiple CPU cores.
+            evaluation_func: Custom evaluation function.
         """
         name = f"{name}(d={depth}, sim={num_simulations})"
         super().__init__(name)
         self.depth = depth
         self.num_simulations = num_simulations
         self.parallelize = parallelize
+        self.evaluation_func = evaluation_func or standard_evaluation
 
     def _simulate_outcome(
         self, battle: Battle, trainer_id: int, my_action: Action, op_action: Action
@@ -409,7 +431,7 @@ class MonteCarloExpectiminimaxAgent(EvaluatingAgent):
             # If we are at depth 0, evaluate. If depth > 1, we would recurse here.
             # For performance, Monte Carlo is usually done at depth 1 or with MCTS.
             # Here we stick to depth 1 evaluation for the sampling.
-            total_score += self._evaluate_battle(sim_battle, trainer_id)
+            total_score += self.evaluation_func(sim_battle, trainer_id)
 
         return total_score / self.num_simulations
 
@@ -428,7 +450,7 @@ class MonteCarloExpectiminimaxAgent(EvaluatingAgent):
         worst_case_expected_value = float("inf")
 
         if not op_actions:
-            return self._evaluate_battle(battle, trainer_id)
+            return self.evaluation_func(battle, trainer_id)
 
         for op_action in op_actions:
             # Calculate Expected Value of this specific matchup (My Move vs Op Move)
@@ -495,7 +517,7 @@ class MonteCarloExpectiminimaxAgent(EvaluatingAgent):
             return best_action
 
 
-class IterativeDeepeningAlphaBetaAgent(EvaluatingAgent):
+class IterativeDeepeningAlphaBetaAgent(BaseAgent):
     """
     An advanced Alpha-Beta agent that uses Iterative Deepening and Move Ordering.
 
@@ -510,18 +532,21 @@ class IterativeDeepeningAlphaBetaAgent(EvaluatingAgent):
         name: str = "IterativeAlphaBeta",
         max_depth: int = 4,
         time_limit: float = 2.0,
+        evaluation_func: Optional[Callable[[Battle, int], float]] = None,
     ):
         """
         Args:
             name: Agent name.
             max_depth: The maximum depth to search if time permits.
             time_limit: Maximum time (in seconds) allowed per turn.
+            evaluation_func: Custom evaluation function.
         """
         name = f"{name}(max_d={max_depth}, time={time_limit}s)"
         super().__init__(name)
         self.max_depth = max_depth
         self.time_limit = time_limit
         self.start_time = 0
+        self.evaluation_func = evaluation_func or standard_evaluation
 
     def _heuristic_sort(
         self, battle: Battle, actions: list[Action], trainer_id: int
@@ -574,14 +599,14 @@ class IterativeDeepeningAlphaBetaAgent(EvaluatingAgent):
 
         # Leaf node or terminal state
         if depth == 0 or battle.winner is not None:
-            return self._evaluate_battle(battle, trainer_id)
+            return self.evaluation_func(battle, trainer_id)
 
         # Get actions
         current_actor = trainer_id if is_maximizing else (1 - trainer_id)
         possible_actions = battle.get_possible_actions(current_actor)
 
         if not possible_actions:
-            return self._evaluate_battle(battle, trainer_id)
+            return self.evaluation_func(battle, trainer_id)
 
         # Optimization: Sort moves to maximize pruning
         # We only sort at higher depths to save overhead on deep leaves
@@ -710,9 +735,7 @@ class IterativeDeepeningAlphaBetaAgent(EvaluatingAgent):
                 else:
                     # If search at this depth failed, stop deepening.
                     if verbose:
-                        logger.info(
-                            f"Depth {d} search failed. Halting deepening."
-                        )
+                        logger.info(f"Depth {d} search failed. Halting deepening.")
                     break
 
         except TimeoutError:
@@ -772,7 +795,7 @@ class MCTSNode:
         return random.choice(best_nodes)
 
 
-class MCTSAgent(EvaluatingAgent):
+class MCTSAgent(BaseAgent):
     """
     Open-Loop MCTS Agent for Simultaneous Stochastic Games.
 
@@ -784,12 +807,17 @@ class MCTSAgent(EvaluatingAgent):
     """
 
     def __init__(
-        self, name: str = "MCTS", time_limit: float = 1.0, rollout_depth: int = 8
+        self,
+        name: str = "MCTS",
+        time_limit: float = 1.0,
+        rollout_depth: int = 8,
+        evaluation_func: Optional[Callable[[Battle, int], float]] = None,
     ):
         name = f"{name}(time={time_limit}s, rollout_d={rollout_depth})"
         super().__init__(name)
         self.time_limit = time_limit
         self.rollout_depth = rollout_depth
+        self.evaluation_func = evaluation_func or standard_evaluation
 
     def get_action(
         self, battle: Battle, trainer_id: int, verbose: bool = False
