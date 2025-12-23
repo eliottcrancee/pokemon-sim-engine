@@ -19,6 +19,7 @@ coverage.xml
 *.log
 .pytest_cache/
 .mypy_cache/
+.benchmark/
 
 # Environment variables
 .env

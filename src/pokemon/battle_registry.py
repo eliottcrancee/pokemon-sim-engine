@@ -58,17 +58,7 @@ class BattleRegistry:
 
     @classmethod
     def register(cls, name: str, trainer1_def: dict, trainer2_def: dict) -> Battle:
-        """
-        Registers a new battle scenario from trainer definitions.
-
-        Args:
-            name: The unique name for the battle scenario.
-            trainer1_def: A dictionary defining the first trainer.
-            trainer2_def: A dictionary defining the second trainer.
-
-        Returns:
-            The created Battle object template.
-        """
+        """Registers a new battle scenario from trainer definitions."""
         if name in cls._battles:
             raise ValueError(f"Battle with name '{name}' already registered.")
 
@@ -81,15 +71,7 @@ class BattleRegistry:
 
     @classmethod
     def get(cls, name: str) -> Battle | None:
-        """
-        Gets a fresh copy of a battle scenario by name.
-
-        Args:
-            name: The name of the battle to retrieve.
-
-        Returns:
-            A copy of the Battle object, or None if not found.
-        """
+        """Gets a fresh copy of a battle scenario by name."""
         battle = cls._battles.get(name)
         return battle.copy() if battle else None
 

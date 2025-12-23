@@ -576,238 +576,172 @@ class SpeciesRegistry:
 
 # --- Registration ---
 
-Pikachu = SpeciesRegistry.register(
-    "Pikachu",
-    (PokemonType.ELECTRIC,),
-    35,
-    55,
-    40,
-    50,
-    50,
-    90,
-    ("Thunder Shock", "Growl", "Quick Attack", "Tail Whip"),
+Turtwig = SpeciesRegistry.register(
+    "Turtwig",
+    (PokemonType.GRASS,),
+    55, 68, 64, 45, 55, 31,
+    ("Tackle", "Withdraw", "Absorb", "Razor Leaf"),
 )
 
 Chimchar = SpeciesRegistry.register(
-    "Chimchar", (PokemonType.FIRE,), 44, 58, 44, 58, 44, 61, ("Scratch", "Ember")
+    "Chimchar",
+    (PokemonType.FIRE,),
+    44, 58, 44, 58, 44, 61,
+    ("Scratch", "Leer", "Ember", "Taunt"),
 )
 
 Piplup = SpeciesRegistry.register(
     "Piplup",
     (PokemonType.WATER,),
-    53,
-    51,
-    53,
-    61,
-    56,
-    40,
-    ("Tackle", "Water Gun", "Growl"),
+    53, 51, 53, 61, 56, 40,
+    ("Pound", "Growl", "Bubble", "Water Gun"),
 )
 
-Bulbasaur = SpeciesRegistry.register(
-    "Bulbasaur",
-    (PokemonType.GRASS, PokemonType.POISON),  # Corrected types
-    45,
-    49,
-    49,
-    65,
-    65,
-    45,
-    ("Tackle", "Growl", "Vine Whip"),
-)
-
-Charmander = SpeciesRegistry.register(
-    "Charmander",
-    (PokemonType.FIRE,),
-    39,
-    52,
-    43,
-    60,
-    50,
-    65,
-    ("Scratch", "Growl", "Ember"),
-)
-
-Squirtle = SpeciesRegistry.register(
-    "Squirtle",
-    (PokemonType.WATER,),
-    44,
-    48,
-    65,
-    50,
-    64,
-    43,
-    ("Tackle", "Tail Whip", "Water Gun"),
-)
-
-Pidgey = SpeciesRegistry.register(
-    "Pidgey",
+Starly = SpeciesRegistry.register(
+    "Starly",
     (PokemonType.NORMAL, PokemonType.FLYING),
-    40,
-    45,
-    40,
-    35,
-    35,
-    56,
-    ("Tackle", "Sand Attack", "Quick Attack"),
+    40, 55, 30, 30, 30, 60,
+    ("Tackle", "Growl", "Quick Attack", "Wing Attack"),
 )
 
-Rattata = SpeciesRegistry.register(
-    "Rattata",
+Shinx = SpeciesRegistry.register(
+    "Shinx",
+    (PokemonType.ELECTRIC,),
+    45, 65, 34, 40, 34, 45,
+    ("Tackle", "Leer", "Thunder Shock", "Spark"),
+)
+
+Garchomp = SpeciesRegistry.register(
+    "Garchomp",
+    (PokemonType.DRAGON, PokemonType.GROUND),
+    108, 130, 95, 80, 85, 102,
+    ("Dragon Rush", "Crunch", "Take Down", "Sand Attack"),
+)
+
+Lucario = SpeciesRegistry.register(
+    "Lucario",
+    (PokemonType.FIGHTING, PokemonType.STEEL),
+    70, 110, 70, 115, 70, 90,
+    ("Aura Sphere", "Mach Punch", "Extreme Speed", "Dragon Pulse"),
+)
+
+Torterra = SpeciesRegistry.register(
+    "Torterra",
+    (PokemonType.GRASS, PokemonType.GROUND),
+    95, 109, 105, 75, 85, 56,
+    ("Earthquake", "Wood Hammer", "Crunch", "Solar Beam"),
+)
+
+Infernape = SpeciesRegistry.register(
+    "Infernape",
+    (PokemonType.FIRE, PokemonType.FIGHTING),
+    76, 104, 71, 104, 71, 108,
+    ("Flare Blitz", "Low Kick", "U-turn", "Mach Punch"),
+)
+
+Empoleon = SpeciesRegistry.register(
+    "Empoleon",
+    (PokemonType.WATER, PokemonType.STEEL),
+    84, 86, 88, 111, 101, 60,
+    ("Hydro Pump", "Flash Cannon", "Ice Beam", "Aqua Jet"),
+)
+
+Staraptor = SpeciesRegistry.register(
+    "Staraptor",
+    (PokemonType.NORMAL, PokemonType.FLYING),
+    85, 120, 70, 50, 60, 100,
+    ("Brave Bird", "Low Kick", "U-turn", "Quick Attack"),
+)
+
+Luxray = SpeciesRegistry.register(
+    "Luxray",
+    (PokemonType.ELECTRIC,),
+    80, 120, 79, 95, 79, 70,
+    ("Wild Charge", "Bite", "Body Slam", "Thunderbolt"),
+)
+
+Weavile = SpeciesRegistry.register(
+    "Weavile",
+    (PokemonType.DARK, PokemonType.ICE),
+    70, 120, 65, 45, 85, 125,
+    ("Ice Shard", "Slash", "Bite", "Low Kick"),
+)
+
+Magnezone = SpeciesRegistry.register(
+    "Magnezone",
+    (PokemonType.ELECTRIC, PokemonType.STEEL),
+    70, 70, 115, 130, 90, 60,
+    ("Thunderbolt", "Flash Cannon", "Thunder Shock", "Tri Attack"),
+)
+
+Rhyperior = SpeciesRegistry.register(
+    "Rhyperior",
+    (PokemonType.ROCK, PokemonType.GROUND),
+    115, 140, 130, 55, 55, 40,
+    ("Earthquake", "Rock Slide", "Megahorn", "Stone Edge"),
+)
+
+Togekiss = SpeciesRegistry.register(
+    "Togekiss",
+    (PokemonType.NORMAL, PokemonType.FLYING), # Fairy type did not exist in Gen 4
+    85, 50, 95, 120, 115, 80,
+    ("Air Slash", "Aura Sphere", "Agility", "Nasty Plot"),
+)
+
+Dialga = SpeciesRegistry.register(
+    "Dialga",
+    (PokemonType.STEEL, PokemonType.DRAGON),
+    100, 120, 120, 150, 100, 90,
+    ("Draco Meteor", "Flash Cannon", "Fire Blast", "Rock Slide"),
+)
+
+Palkia = SpeciesRegistry.register(
+    "Palkia",
+    (PokemonType.WATER, PokemonType.DRAGON),
+    90, 120, 100, 150, 120, 100,
+    ("Spacial Rend", "Hydro Pump", "Fire Blast", "Thunder"),
+)
+
+Giratina = SpeciesRegistry.register(
+    "Giratina",
+    (PokemonType.GHOST, PokemonType.DRAGON),
+    150, 100, 120, 100, 120, 90, # Altered Forme
+    ("Shadow Claw", "Draco Meteor", "Aura Sphere", "Will-O-Wisp"),
+)
+
+Arceus = SpeciesRegistry.register(
+    "Arceus",
     (PokemonType.NORMAL,),
-    30,
-    56,
-    35,
-    25,
-    35,
-    72,
-    ("Tackle", "Tail Whip", "Quick Attack"),
+    120, 120, 120, 120, 120, 120,
+    ("Judgment", "Extreme Speed", "Swords Dance", "Shadow Claw"),
 )
 
-Sandshrew = SpeciesRegistry.register(
-    "Sandshrew",
+Gible = SpeciesRegistry.register(
+    "Gible",
+    (PokemonType.DRAGON, PokemonType.GROUND),
+    58, 70, 45, 40, 45, 42,
+    ("Tackle", "Sand Attack", "Dragon Rage", "Take Down"),
+)
+
+Riolu = SpeciesRegistry.register(
+    "Riolu",
+    (PokemonType.FIGHTING,),
+    40, 70, 40, 35, 40, 60,
+    ("Quick Attack", "Mach Punch"),
+)
+
+Hippopotas = SpeciesRegistry.register(
+    "Hippopotas",
     (PokemonType.GROUND,),
-    50,
-    75,
-    85,
-    20,
-    30,
-    40,
-    ("Scratch", "Sand Attack"),
+    68, 72, 78, 38, 42, 32,
+    ("Tackle", "Sand Attack", "Bite", "Body Slam"),
 )
 
-Eevee = SpeciesRegistry.register(
-    "Eevee",
-    (PokemonType.NORMAL,),
-    55,
-    55,
-    50,
-    45,
-    65,
-    55,
-    ("Tackle", "Tail Whip", "Sand Attack"),
-)
-
-Charizard = SpeciesRegistry.register(
-    "Charizard",
-    (PokemonType.FIRE, PokemonType.FLYING),
-    78,
-    84,
-    78,
-    109,
-    85,
-    100,
-    ("Flamethrower", "Wing Attack", "Slash", "Growl"),
-)
-Blastoise = SpeciesRegistry.register(
-    "Blastoise",
-    (PokemonType.WATER,),
-    79,
-    83,
-    100,
-    85,
-    105,
-    78,
-    ("Hydro Pump", "Skull Bash", "Bite", "Tackle"),
-)
-Venosaur = SpeciesRegistry.register(
-    "Venosaur",
-    (PokemonType.GRASS, PokemonType.POISON),
-    80,
-    82,
-    83,
-    100,
-    100,
-    80,
-    ("Solar Beam", "Razor Leaf", "Tackle", "Growl"),
-)
-Snorlax = SpeciesRegistry.register(
-    "Snorlax",
-    (PokemonType.NORMAL,),
-    160,
-    110,
-    65,
-    65,
-    110,
-    30,
-    ("Body Slam", "Hyper Beam", "Pound", "Tackle"),
-)
-Lapras = SpeciesRegistry.register(
-    "Lapras",
-    (PokemonType.WATER, PokemonType.ICE),
-    130,
-    85,
-    80,
-    85,
-    95,
-    60,
-    ("Blizzard", "Body Slam", "Hydro Pump", "Growl"),
-)
-Pidgeot = SpeciesRegistry.register(
-    "Pidgeot",
-    (PokemonType.NORMAL, PokemonType.FLYING),
-    83,
-    80,
-    75,
-    70,
-    70,
-    101,
-    ("Wing Attack", "Sky Attack", "Tackle", "Sand Attack"),
-)
-Alakazam = SpeciesRegistry.register(
-    "Alakazam",
-    (PokemonType.PSYCHIC,),
-    55,
-    50,
-    45,
-    135,
-    95,
-    120,
-    ("Psychic", "Tackle", "Pound", "Growl"),
-)
-Rhydon = SpeciesRegistry.register(
-    "Rhydon",
-    (PokemonType.GROUND, PokemonType.ROCK),
-    105,
-    130,
-    120,
-    45,
-    45,
-    40,
-    ("Earthquake", "Rock Slide", "Pound", "Tail Whip"),
-)
-Gyarados = SpeciesRegistry.register(
-    "Gyarados",
-    (PokemonType.WATER, PokemonType.FLYING),
-    95,
-    125,
-    79,
-    60,
-    100,
-    81,
-    ("Hydro Pump", "Hyper Beam", "Dragon Rage", "Tackle"),
-)
-Arcanine = SpeciesRegistry.register(
-    "Arcanine",
-    (PokemonType.FIRE,),
-    90,
-    110,
-    80,
-    100,
-    80,
-    95,
-    ("Flamethrower", "Extreme Speed", "Bite", "Growl"),
-)
-Exeggutor = SpeciesRegistry.register(
-    "Exeggutor",
-    (PokemonType.GRASS, PokemonType.PSYCHIC),
-    95,
-    95,
-    85,
-    125,
-    65,
-    55,
-    ("Psychic", "Solar Beam", "Tackle", "Growl"),
+Croagunk = SpeciesRegistry.register(
+    "Croagunk",
+    (PokemonType.POISON, PokemonType.FIGHTING),
+    48, 61, 40, 61, 40, 50,
+    ("Poison Sting", "Mud-Slap", "Taunt"),
 )
 
 # --- Accessor Helper ---

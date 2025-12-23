@@ -557,7 +557,63 @@ SkullBash = MoveRegistry.register(
 SkyAttack = MoveRegistry.register(
     SimpleMove("Sky Attack", MoveCategory.PHYSICAL, PokemonType.FLYING, 140, 90, 5)
 )
-
+TakeDown = MoveRegistry.register(
+    RecoilMove("Take Down", MoveCategory.PHYSICAL, PokemonType.NORMAL, 90, 85, 20)
+)
+Crunch = MoveRegistry.register(
+    SimpleMove("Crunch", MoveCategory.PHYSICAL, PokemonType.DARK, 80, 100, 15)
+)
+MachPunch = MoveRegistry.register(
+    SimpleMove("Mach Punch", MoveCategory.PHYSICAL, PokemonType.FIGHTING, 40, 100, 30, priority=1)
+)
+AquaJet = MoveRegistry.register(
+    SimpleMove("Aqua Jet", MoveCategory.PHYSICAL, PokemonType.WATER, 40, 100, 20, priority=1)
+)
+IceShard = MoveRegistry.register(
+    SimpleMove("Ice Shard", MoveCategory.PHYSICAL, PokemonType.ICE, 40, 100, 30, priority=1)
+)
+ShadowClaw = MoveRegistry.register(
+    SimpleMove("Shadow Claw", MoveCategory.PHYSICAL, PokemonType.GHOST, 70, 100, 15)
+)
+PoisonSting = MoveRegistry.register(
+    ApplyStatusMove(
+        "Poison Sting", MoveCategory.PHYSICAL, PokemonType.POISON, 15, 100, 35,
+        status_to_apply=PokemonStatus.POISON, effect_chance=0.3
+    )
+)
+BraveBird = MoveRegistry.register(
+    RecoilMove("Brave Bird", MoveCategory.PHYSICAL, PokemonType.FLYING, 120, 100, 15, recoil_ratio=0.33)
+)
+WoodHammer = MoveRegistry.register(
+    RecoilMove("Wood Hammer", MoveCategory.PHYSICAL, PokemonType.GRASS, 120, 100, 15, recoil_ratio=0.33)
+)
+FlareBlitz = MoveRegistry.register(
+    RecoilMove("Flare Blitz", MoveCategory.PHYSICAL, PokemonType.FIRE, 120, 100, 15, recoil_ratio=0.33)
+)
+WildCharge = MoveRegistry.register(
+    RecoilMove("Wild Charge", MoveCategory.PHYSICAL, PokemonType.ELECTRIC, 90, 100, 15, recoil_ratio=0.25)
+)
+LowKick = MoveRegistry.register(
+    SimpleMove("Low Kick", MoveCategory.PHYSICAL, PokemonType.FIGHTING, 50, 100, 20)
+)
+Megahorn = MoveRegistry.register(
+    SimpleMove("Megahorn", MoveCategory.PHYSICAL, PokemonType.BUG, 120, 85, 10)
+)
+StoneEdge = MoveRegistry.register(
+    SimpleMove("Stone Edge", MoveCategory.PHYSICAL, PokemonType.ROCK, 100, 80, 5)
+)
+DragonRush = MoveRegistry.register(
+    SimpleMove("Dragon Rush", MoveCategory.PHYSICAL, PokemonType.DRAGON, 100, 75, 10)
+)
+Uturn = MoveRegistry.register(
+    SimpleMove("U-turn", MoveCategory.PHYSICAL, PokemonType.BUG, 70, 100, 20)
+)
+Spark = MoveRegistry.register(
+    ApplyStatusMove(
+        "Spark", MoveCategory.PHYSICAL, PokemonType.ELECTRIC, 65, 100, 20,
+        status_to_apply=PokemonStatus.PARALYSIS, effect_chance=0.3
+    )
+)
 
 # Special
 ThunderShock = MoveRegistry.register(
@@ -571,7 +627,7 @@ Ember = MoveRegistry.register(
         power=40,
         accuracy=100,
         pp=25,
-        effect_chance=0.1,  # 10% chance
+        effect_chance=0.1,
         status_to_apply=PokemonStatus.BURN,
     )
 )
@@ -579,13 +635,19 @@ WaterGun = MoveRegistry.register(
     SimpleMove("Water Gun", MoveCategory.SPECIAL, PokemonType.WATER, 40, 100, 25)
 )
 Flamethrower = MoveRegistry.register(
-    SimpleMove("Flamethrower", MoveCategory.SPECIAL, PokemonType.FIRE, 95, 100, 15)
+    ApplyStatusMove(
+        "Flamethrower", MoveCategory.SPECIAL, PokemonType.FIRE, 90, 100, 15,
+        status_to_apply=PokemonStatus.BURN, effect_chance=0.1
+    )
 )
 HydroPump = MoveRegistry.register(
-    SimpleMove("Hydro Pump", MoveCategory.SPECIAL, PokemonType.WATER, 120, 80, 5)
+    SimpleMove("Hydro Pump", MoveCategory.SPECIAL, PokemonType.WATER, 110, 80, 5)
 )
 Thunderbolt = MoveRegistry.register(
-    SimpleMove("Thunderbolt", MoveCategory.SPECIAL, PokemonType.ELECTRIC, 95, 100, 15)
+    ApplyStatusMove(
+        "Thunderbolt", MoveCategory.SPECIAL, PokemonType.ELECTRIC, 90, 100, 15,
+        status_to_apply=PokemonStatus.PARALYSIS, effect_chance=0.1
+    )
 )
 Psychic = MoveRegistry.register(
     SimpleMove("Psychic", MoveCategory.SPECIAL, PokemonType.PSYCHIC, 90, 100, 10)
@@ -597,11 +659,69 @@ HyperBeam = MoveRegistry.register(
     SimpleMove("Hyper Beam", MoveCategory.SPECIAL, PokemonType.NORMAL, 150, 90, 5)
 )
 Blizzard = MoveRegistry.register(
-    SimpleMove("Blizzard", MoveCategory.SPECIAL, PokemonType.ICE, 110, 70, 5)
+    ApplyStatusMove(
+        "Blizzard", MoveCategory.SPECIAL, PokemonType.ICE, 110, 70, 5,
+        status_to_apply=PokemonStatus.FREEZE, effect_chance=0.1
+    )
 )
 DragonRage = MoveRegistry.register(
     SimpleMove("Dragon Rage", MoveCategory.SPECIAL, PokemonType.DRAGON, 40, 100, 10)
 )
+Absorb = MoveRegistry.register(
+    SimpleMove("Absorb", MoveCategory.SPECIAL, PokemonType.GRASS, 20, 100, 25)
+)
+Bubble = MoveRegistry.register(
+    SimpleMove("Bubble", MoveCategory.SPECIAL, PokemonType.WATER, 40, 100, 30)
+)
+AuraSphere = MoveRegistry.register(
+    SimpleMove("Aura Sphere", MoveCategory.SPECIAL, PokemonType.FIGHTING, 80, 101, 20) # 101 Accuracy for 'never miss'
+)
+DragonPulse = MoveRegistry.register(
+    SimpleMove("Dragon Pulse", MoveCategory.SPECIAL, PokemonType.DRAGON, 85, 100, 10)
+)
+FlashCannon = MoveRegistry.register(
+    SimpleMove("Flash Cannon", MoveCategory.SPECIAL, PokemonType.STEEL, 80, 100, 10)
+)
+IceBeam = MoveRegistry.register(
+    ApplyStatusMove(
+        "Ice Beam", MoveCategory.SPECIAL, PokemonType.ICE, 90, 100, 10,
+        status_to_apply=PokemonStatus.FREEZE, effect_chance=0.1
+    )
+)
+TriAttack = MoveRegistry.register(
+    SimpleMove("Tri Attack", MoveCategory.SPECIAL, PokemonType.NORMAL, 80, 100, 10)
+)
+AirSlash = MoveRegistry.register(
+    SimpleMove("Air Slash", MoveCategory.SPECIAL, PokemonType.FLYING, 75, 95, 15)
+)
+FireBlast = MoveRegistry.register(
+    ApplyStatusMove(
+        "Fire Blast", MoveCategory.SPECIAL, PokemonType.FIRE, 110, 85, 5,
+        status_to_apply=PokemonStatus.BURN, effect_chance=0.1
+    )
+)
+Thunder = MoveRegistry.register(
+    ApplyStatusMove(
+        "Thunder", MoveCategory.SPECIAL, PokemonType.ELECTRIC, 110, 70, 10,
+        status_to_apply=PokemonStatus.PARALYSIS, effect_chance=0.3
+    )
+)
+SpacialRend = MoveRegistry.register(
+    SimpleMove("Spacial Rend", MoveCategory.SPECIAL, PokemonType.DRAGON, 100, 95, 5)
+)
+DracoMeteor = MoveRegistry.register(
+    SimpleMove("Draco Meteor", MoveCategory.SPECIAL, PokemonType.DRAGON, 130, 90, 5)
+)
+Judgment = MoveRegistry.register(
+    SimpleMove("Judgment", MoveCategory.SPECIAL, PokemonType.NORMAL, 100, 100, 10)
+)
+MudSlap = MoveRegistry.register(
+    ApplyStatusMove(
+        "Mud-Slap", MoveCategory.SPECIAL, PokemonType.GROUND, 20, 100, 10,
+        volatile_status="accuracy",
+    )
+)
+
 
 # Status
 Growl = MoveRegistry.register(StatMove("Growl", PokemonType.NORMAL, 40, "attack", -1))
@@ -614,7 +734,16 @@ SandAttack = MoveRegistry.register(
 Agility = MoveRegistry.register(
     StatMove("Agility", PokemonType.PSYCHIC, 30, "speed", 2, self_target=True)
 )
-
+Leer = MoveRegistry.register(StatMove("Leer", PokemonType.NORMAL, 30, "defense", -1))
+Withdraw = MoveRegistry.register(
+    StatMove("Withdraw", PokemonType.WATER, 40, "defense", 1, self_target=True)
+)
+SwordsDance = MoveRegistry.register(
+    StatMove("Swords Dance", PokemonType.NORMAL, 20, "attack", 2, self_target=True)
+)
+NastyPlot = MoveRegistry.register(
+    StatMove("Nasty Plot", PokemonType.DARK, 20, "sp_attack", 2, self_target=True)
+)
 
 SleepPowder = MoveRegistry.register(
     ApplyStatusMove(

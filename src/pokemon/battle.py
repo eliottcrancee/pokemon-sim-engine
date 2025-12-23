@@ -14,7 +14,7 @@ class Battle:
     def __init__(
         self,
         trainers: tuple[Trainer, Trainer],
-        max_rounds: int = 100,
+        max_rounds: int = 200,
         headless: bool = True,
     ):
         self.trainers = trainers
