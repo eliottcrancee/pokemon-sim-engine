@@ -115,13 +115,14 @@ class Battle:
                 Message(f"{user.surname}'s attack missed because the target fainted!")
             ]
 
-        if action.move_slot_index == -1:  # Special case for Struggle
+        move_slot_index = action.attack_move_slot_index
+        if move_slot_index == -1:  # Special case for Struggle
             move = MoveRegistry.get("Struggle")
             if move is None:
                 raise ValueError("Struggle move not registered.")
         else:
-            move = user.move_slots[action.move_slot_index].move
-            user.decrease_pp(action.move_slot_index)
+            move = user.move_slots[move_slot_index].move
+            user.decrease_pp(move_slot_index)
 
         if self.headless:
             messages = []
@@ -163,24 +164,24 @@ class Battle:
     def _execute_switch(
         self, action: Action, trainer: Trainer, opponent: Trainer
     ) -> list[Message]:
-        target_pokemon = trainer.pokemon_team[action.pokemon_index]
+        pokemon_index = action.switch_pokemon_index
+        target_pokemon = trainer.pokemon_team[pokemon_index]
         if self.headless:
             messages = []
         else:
             messages = [Message(f"{trainer.name} brings in {target_pokemon.surname}!")]
-        trainer.switch_pokemon(action.pokemon_index)
+        trainer.switch_pokemon(pokemon_index)
         return messages
 
     def _execute_use_item(
         self, action: Action, trainer: Trainer, opponent: Trainer
     ) -> list[Message]:
-        item = ItemRegistry.get(action.item_id)
-        if item is None:
-            if self.headless:
-                return []
-            return [Message(f"Item with if '{action.item_id}' not found.")]
+        item_id = action.use_item_id
+        target_index = action.use_item_target_index
 
-        target_pokemon = trainer.pokemon_team[action.target_index]
+        item = ItemRegistry.get(item_id)
+
+        target_pokemon = trainer.pokemon_team[target_index]
         if self.headless:
             messages = []
         else:
@@ -200,9 +201,10 @@ class Battle:
         if action_type == ActionType.SWITCH or action_type == ActionType.USE_ITEM:
             return 10  # Highest priority
         if action_type == ActionType.ATTACK:
-            if action.move_slot_index == -1:  # Struggle has low priority
+            move_slot_index = action.attack_move_slot_index
+            if move_slot_index == -1:  # Struggle has low priority
                 return -1
-            move = trainer.active_pokemon.move_slots[action.move_slot_index].move
+            move = trainer.active_pokemon.move_slots[move_slot_index].move
             return move.priority
         return -10  # PassAction
 

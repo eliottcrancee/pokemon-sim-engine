@@ -29,7 +29,7 @@ class BaseAgent(abc.ABC):
             trainer_id: The ID of the trainer for which to get the action.
             verbose: Whether to log verbose output.
         Returns:
-            The action(s) to take.
+            The action to take.
         """
         raise NotImplementedError
 

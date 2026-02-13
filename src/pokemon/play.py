@@ -1,10 +1,9 @@
-# play.py
-
 import random
 
 from joblib import Parallel, cpu_count, delayed
 from tqdm import tqdm
 
+from pokemon.action import Action
 from pokemon.agents import BaseAgent, InputAgent
 from pokemon.battle import Battle
 from pokemon.loguru_logger import logger
@@ -15,8 +14,8 @@ def play(
 ) -> float:
     """Main game loop."""
 
-    if isinstance(agent_0, InputAgent) and isinstance(agent_1, InputAgent):
-        raise ValueError("UI mode is not supported in this play function.")
+    if isinstance(agent_0, InputAgent) or isinstance(agent_1, InputAgent):
+        raise ValueError("InputAgent is not supported in this play function.")
 
     if verbose:
         logger.info(f"Starting a new battle between {agent_0.name} and {agent_1.name}")
@@ -25,11 +24,19 @@ def play(
     while not battle.done:
         action_0 = agent_0.get_action(battle, 0, verbose=verbose)
         action_1 = agent_1.get_action(battle, 1, verbose=verbose)
+
+        if not isinstance(action_0, Action) or not isinstance(action_1, Action):
+            raise TypeError("Agents used in play() must return a single Action.")
+
         messages = battle.turn(action_0, action_1)
         if verbose:
             for message in messages:
-                logger.info(message.message)
-    return battle.winner
+                logger.info(message.text)
+    if battle.tie:
+        return 0.5
+    if battle.winner is None:
+        raise RuntimeError("Battle ended without winner or tie state.")
+    return float(battle.winner)
 
 
 def play_multiple(
@@ -42,8 +49,8 @@ def play_multiple(
 ) -> tuple[int, int, int]:
     """Play multiple battles in parallel using joblib."""
 
-    if isinstance(agent_0, InputAgent) and isinstance(agent_1, InputAgent):
-        raise ValueError("UI mode is not supported in this play function.")
+    if isinstance(agent_0, InputAgent) or isinstance(agent_1, InputAgent):
+        raise ValueError("InputAgent is not supported in this play function.")
 
     if n_jobs == -1:
         n_jobs = cpu_count()
@@ -74,7 +81,7 @@ def play_tournament(
     battle: Battle,
     n_matches: int,
     n_battles_per_match: int,
-) -> None:
+) -> list[BaseAgent]:
     for _ in tqdm(range(n_matches), desc="Glicko-2 Tournament"):
         agent0, agent1 = random.sample(agent_pool, 2)
 

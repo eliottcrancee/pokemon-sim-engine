@@ -1,11 +1,11 @@
-# tests/test_battle.py
+from unittest.mock import patch
 
 import pytest
 
 from pokemon.action import Action, ActionType
 from pokemon.battle import Battle
-from pokemon.message import Message
 from pokemon.pokemon import Pokedex, Pokemon
+from pokemon.pokemon_status import PokemonStatus
 from pokemon.trainer import Trainer
 
 
@@ -13,14 +13,14 @@ from pokemon.trainer import Trainer
 def battle_instance():
     """Fixture to create a standard battle instance for testing."""
     trainer1 = Trainer(
-        name="Ash",
+        name="Dawn",
         pokemon_team=[
-            Pokemon(species=Pokedex.Pikachu, level=12),
+            Pokemon(species=Pokedex.Shinx, level=12),
             Pokemon(species=Pokedex.Chimchar, level=10),
         ],
     )
     trainer2 = Trainer(
-        name="Gary", pokemon_team=[Pokemon(species=Pokedex.Piplup, level=11)]
+        name="Lucas", pokemon_team=[Pokemon(species=Pokedex.Piplup, level=11)]
     )
     return Battle(trainers=(trainer1, trainer2), headless=False)
 
@@ -28,25 +28,25 @@ def battle_instance():
 @pytest.fixture
 def faint_scenario_battle():
     """Fixture to create a battle where a pokemon can faint easily."""
-    pikachu = Pokemon(species=Pokedex.Pikachu, level=10)
-    pikachu.hp = 1  # Manually set HP after creation
+    shinx = Pokemon(species=Pokedex.Shinx, level=10)
+    shinx.hp = 1  # Manually set HP after creation
 
     trainer1 = Trainer(
-        name="Ash",
+        name="Dawn",
         pokemon_team=[
-            pikachu,
+            shinx,
             Pokemon(species=Pokedex.Chimchar, level=10),
         ],
     )
     trainer2 = Trainer(
-        name="Gary",
+        name="Lucas",
         pokemon_team=[
             Pokemon(species=Pokedex.Piplup, level=10),
         ],
     )
     battle = Battle(trainers=(trainer1, trainer2), headless=False)
-    battle.trainers[0].active_pokemon.hp = 1  # Set Pikachu's HP to 1 after reset
-    # Ensure Piplup has an attack that can one-shot Pikachu
+    battle.trainers[0].active_pokemon.hp = 1  # Set Shinx's HP to 1 after reset
+    # Ensure Piplup has an attack that can one-shot Shinx
     piplup = battle.trainers[1].active_pokemon
     piplup.move_slots[0].move.power = 100  # Make the first move very powerful
     return battle
@@ -55,26 +55,28 @@ def faint_scenario_battle():
 @pytest.fixture
 def struggle_scenario_battle():
     """Fixture to create a battle where a pokemon is forced to Struggle."""
-    # Create a Pikachu with all PP reduced to 0
-    pikachu_struggle = Pokemon(species=Pokedex.Pikachu, level=10)
-    for slot in pikachu_struggle.move_slots:
+    # Create a Shinx with all PP reduced to 0
+    shinx_struggle = Pokemon(species=Pokedex.Shinx, level=10)
+    for slot in shinx_struggle.move_slots:
         slot.current_pp = 0
 
     trainer1 = Trainer(
-        name="Ash",
+        name="Dawn",
         pokemon_team=[
-            pikachu_struggle,
+            shinx_struggle,
             Pokemon(species=Pokedex.Chimchar, level=10),
         ],
     )
     trainer2 = Trainer(
-        name="Gary",
+        name="Lucas",
         pokemon_team=[
             Pokemon(species=Pokedex.Piplup, level=10),
         ],
     )
     battle = Battle(trainers=(trainer1, trainer2), headless=False)
-    for slot in battle.trainers[0].active_pokemon.move_slots: # Set PP to 0 after battle reset
+    for slot in battle.trainers[
+        0
+    ].active_pokemon.move_slots:  # Set PP to 0 after battle reset
         slot.current_pp = 0
     return battle
 
@@ -84,8 +86,8 @@ def test_battle_initialization(battle_instance):
     assert battle_instance.round == 0
     assert not battle_instance.done
     assert battle_instance.winner is None
-    assert battle_instance.trainers[0].name == "Ash"
-    assert battle_instance.trainers[1].name == "Gary"
+    assert battle_instance.trainers[0].name == "Dawn"
+    assert battle_instance.trainers[1].name == "Lucas"
 
 
 def test_get_possible_actions(battle_instance):
@@ -137,7 +139,9 @@ def test_faint_and_switch_logic(faint_scenario_battle):
 
     # For Trainer 0, let's just make Pikachu try to attack (it will faint)
     actions_t0_initial = battle.get_possible_actions(0)
-    attack_t0 = next(a for a in actions_t0_initial if a.action_type == ActionType.ATTACK)
+    attack_t0 = next(
+        a for a in actions_t0_initial if a.action_type == ActionType.ATTACK
+    )
 
     # Execute the turn where Pikachu faints
     messages = battle.turn(attack_t0, attack_t1)
@@ -154,7 +158,7 @@ def test_faint_and_switch_logic(faint_scenario_battle):
     assert actions_t0_after_faint[0].action_type == ActionType.SWITCH
     assert actions_t0_after_faint[0].pokemon_index == 1  # Switch to Chimchar
 
-    # Trainer 1 (Gary) should only be able to pass
+    # Trainer 1 (Lucas) should only be able to pass
     actions_t1_after_faint = battle.get_possible_actions(1)
     assert len(actions_t1_after_faint) == 1
     assert actions_t1_after_faint[0].action_type == ActionType.PASS
@@ -168,8 +172,8 @@ def test_faint_and_switch_logic(faint_scenario_battle):
     assert battle.round == 2
     assert (
         battle.trainers[0].active_pokemon.surname == "Chimchar"
-    )  # Ash switched to Chimchar
-    assert any("Ash brings in Chimchar!" in m.text for m in messages_switch_turn)
+    )  # Dawn switched to Chimchar
+    assert any("Dawn brings in Chimchar!" in m.text for m in messages_switch_turn)
     assert any("waits." in m.text for m in messages_switch_turn)
     assert not battle.done
 
@@ -181,8 +185,8 @@ def test_struggle_mechanics(struggle_scenario_battle):
     # Trainer 0 (Ash's Pikachu) should be forced to Struggle
     actions_t0 = battle.get_possible_actions(0)
     assert Action.create_attack(move_slot_index=-1) in actions_t0
-    assert Action.create_switch(pokemon_index=1) in actions_t0 # Pikachu's teammate
-    assert len(actions_t0) == 2 # Struggle and one Switch
+    assert Action.create_switch(pokemon_index=1) in actions_t0  # Pikachu's teammate
+    assert len(actions_t0) == 2  # Struggle and one Switch
 
     struggle_action_t0 = actions_t0[0]
 
@@ -224,6 +228,80 @@ def test_battle_tie_condition(battle_instance):
     assert battle_instance.end() is True
     assert battle_instance.tie is True
     assert battle_instance.winner is None
+
+
+def test_after_turn_poison_can_end_in_tie():
+    """If both active Pokemon are at 1 HP and poisoned, end-of-turn should tie."""
+    dawn = Trainer(name="Dawn", pokemon_team=[Pokemon(species=Pokedex.Shinx, level=10)])
+    lucas = Trainer(
+        name="Lucas", pokemon_team=[Pokemon(species=Pokedex.Starly, level=10)]
+    )
+    battle = Battle((dawn, lucas), headless=False)
+
+    p0 = battle.trainers[0].active_pokemon
+    p1 = battle.trainers[1].active_pokemon
+    p0.hp = 1
+    p1.hp = 1
+    p0.status = PokemonStatus.POISON
+    p1.status = PokemonStatus.POISON
+
+    messages = battle.turn(Action.create_pass(), Action.create_pass())
+
+    assert battle.done is True
+    assert battle.tie is True
+    assert battle.winner is None
+    assert p0.is_alive is False
+    assert p1.is_alive is False
+    assert any("hurt by poison" in m.text for m in messages)
+    assert any("fainted" in m.text for m in messages)
+
+
+def test_after_turn_damage_happens_after_actions():
+    """A poisoned attacker at 1 HP still executes its move before after-turn KO."""
+    dawn = Trainer(name="Dawn", pokemon_team=[Pokemon(species=Pokedex.Shinx, level=20)])
+    lucas = Trainer(
+        name="Lucas", pokemon_team=[Pokemon(species=Pokedex.Starly, level=20)]
+    )
+    battle = Battle((dawn, lucas), headless=True)
+
+    attacker = battle.trainers[0].active_pokemon
+    defender = battle.trainers[1].active_pokemon
+    attacker.status = PokemonStatus.POISON
+    attacker.hp = 1
+    initial_defender_hp = defender.hp
+
+    battle.turn(Action.create_attack(0), Action.create_pass())
+
+    assert defender.hp < initial_defender_hp
+    assert attacker.is_alive is False
+    assert battle.done is True
+    assert battle.winner == 1
+
+
+@patch("random.random", return_value=0.5)
+def test_turn_skips_second_action_when_first_action_ends_battle(_mock_random):
+    """If the first action KOs the last opponent Pokemon, second action is skipped."""
+    fast_attacker = Pokemon(species=Pokedex.Shinx, level=50)
+    lone_target = Pokemon(species=Pokedex.Starly, level=5)
+    lone_target.hp = 1
+
+    trainer_fast = Trainer(name="Fast", pokemon_team=[fast_attacker])
+    trainer_slow = Trainer(name="Slow", pokemon_team=[lone_target])
+    battle = Battle((trainer_fast, trainer_slow), headless=True)
+
+    battle.trainers[0].active_pokemon.move_slots[0].move.power = 150
+    battle.trainers[1].active_pokemon.move_slots[0].move.power = 150
+
+    initial_fast_hp = battle.trainers[0].active_pokemon.hp
+    action_fast = Action.create_attack(0)
+    action_slow = Action.create_attack(0)
+
+    battle.turn(action_fast, action_slow)
+
+    assert battle.done is True
+    assert battle.winner == 0
+    assert battle.trainers[0].active_pokemon.hp == initial_fast_hp
+
 
 def test_battle_custom_copy_performance(benchmark, battle_instance):
     """Benchmarks the custom copy method."""

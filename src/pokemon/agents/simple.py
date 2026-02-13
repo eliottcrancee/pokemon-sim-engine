@@ -14,9 +14,13 @@ class InputAgent(BaseAgent):
 
     def get_action(
         self, battle: Battle, trainer_id: int, verbose: bool = False
-    ) -> list[Action]:
-        """Return all possible actions to be displayed to the user."""
-        return battle.get_possible_actions(trainer_id)
+    ) -> Action:
+        """Return a single fallback action.
+
+        Interactive selection is handled by the UI loop. This fallback keeps
+        the BaseAgent contract consistent when called directly.
+        """
+        return battle.get_possible_actions(trainer_id)[0]
 
 
 class FirstAgent(BaseAgent):

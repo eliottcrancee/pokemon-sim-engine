@@ -1,20 +1,19 @@
 import os
-import sys
 import re
+import sys
 import time
 from collections import deque
+
 import readchar
 import readchar.key
-
 from colorama import Fore, Style, init
 
-# Assume these imports exist as per prompt instructions
 from pokemon.action import Action, ActionType
 from pokemon.agents import BaseAgent, InputAgent
 from pokemon.battle import Battle
+from pokemon.item import ItemRegistry
 from pokemon.pokemon import Pokemon, PokemonStatus
 from pokemon.trainer import Trainer
-from pokemon.item import ItemRegistry # Added for ItemRegistry
 
 # Initialize colorama
 init(autoreset=True)
@@ -26,38 +25,44 @@ MESSAGE_BOX_HEIGHT = 8
 TEXT_DELAY = 0.01  # Seconds between characters for the typewriter effect
 
 # Colors
-COLOR_HP_HIGH = Fore.GREEN
-COLOR_HP_MID = Fore.YELLOW
-COLOR_HP_LOW = Fore.RED
-COLOR_HP_EMPTY = Fore.LIGHTBLACK_EX  # Dark Gray for empty HP bar
-COLOR_POKEMON_NAME = Fore.CYAN + Style.BRIGHT
-COLOR_TRAINER_NAME = Fore.MAGENTA + Style.BRIGHT
-COLOR_MESSAGE = Fore.WHITE
-COLOR_WARNING = Fore.YELLOW
-COLOR_ERROR = Fore.RED + Style.BRIGHT
-COLOR_MENU = Fore.BLUE
-COLOR_SELECTED_MENU = Fore.YELLOW + Style.BRIGHT
-COLOR_FADED = Fore.BLACK + Style.BRIGHT
+COLOR_HP_HIGH: str = str(Fore.GREEN)
+COLOR_HP_MID: str = str(Fore.YELLOW)
+COLOR_HP_LOW: str = str(Fore.RED)
+COLOR_HP_EMPTY: str = str(Fore.LIGHTBLACK_EX)
+COLOR_POKEMON_NAME: str = str(Fore.CYAN) + str(Style.BRIGHT)
+COLOR_TRAINER_NAME: str = str(Fore.MAGENTA) + str(Style.BRIGHT)
+COLOR_MESSAGE: str = str(Fore.WHITE)
+COLOR_WARNING: str = str(Fore.YELLOW)
+COLOR_ERROR: str = str(Fore.RED) + str(Style.BRIGHT)
+COLOR_MENU: str = str(Fore.BLUE)
+COLOR_SELECTED_MENU: str = str(Fore.YELLOW) + str(Style.BRIGHT)
+COLOR_RESET: str = str(Style.RESET_ALL)
+
+KEY_UP: str = str(getattr(readchar.key, "UP", "\x1b[A"))
+KEY_DOWN: str = str(getattr(readchar.key, "DOWN", "\x1b[B"))
+KEY_ENTER: str = str(getattr(readchar.key, "ENTER", "\r"))
 
 
 def get_action_description(action: Action, battle: Battle, trainer_id: int) -> str:
     trainer = battle.get_trainer_by_id(trainer_id)
     if action.action_type == ActionType.ATTACK:
         pokemon = trainer.active_pokemon
-        if action.move_slot_index == -1:  # Struggle
+        move_slot_index = action.attack_move_slot_index
+        if move_slot_index == -1:
             move_name = "Struggle"
             pp_info = "---"
         else:
-            move_slot = pokemon.move_slots[action.move_slot_index]
+            move_slot = pokemon.move_slots[move_slot_index]
             move_name = move_slot.move.name
             pp_info = f"PP: {move_slot.current_pp}/{move_slot.max_pp}"
         return f"Attack {move_name} ({pp_info})"
     elif action.action_type == ActionType.SWITCH:
-        pokemon_to_switch = trainer.pokemon_team[action.pokemon_index]
+        pokemon_to_switch = trainer.pokemon_team[action.switch_pokemon_index]
         return f"Switch to {pokemon_to_switch.surname} (PV: {pokemon_to_switch.hp}/{pokemon_to_switch.max_hp})"
     elif action.action_type == ActionType.USE_ITEM:
-        target_pokemon = trainer.pokemon_team[action.target_index]
-        item_name = ItemRegistry.get(action.item_id).name
+        target_pokemon = trainer.pokemon_team[action.use_item_target_index]
+        item = ItemRegistry.get(action.use_item_id)
+        item_name = item.name
         return f"Use {item_name} on {target_pokemon.surname} (PV: {target_pokemon.hp}/{target_pokemon.max_hp})"
     elif action.action_type == ActionType.PASS:
         return "Wait (Opponent is switching)"
@@ -99,8 +104,8 @@ def draw_box(
     lines: list[str],
     width: int = BATTLE_SCREEN_WIDTH,
     padding: int = 1,
-    title: str = None,
-    color: str = Fore.WHITE,
+    title: str | None = None,
+    color: str = COLOR_MESSAGE,
 ) -> list[str]:
     """Draws a box around the given lines of text."""
     box_lines = []
@@ -118,7 +123,7 @@ def draw_box(
                 "╔" + ("═" * left_side_len) + clean_title + ("═" * right_side_len) + "╗"
             )
 
-    box_lines.append(color + top_border + Style.RESET_ALL)
+    box_lines.append(f"{color}{top_border}{COLOR_RESET}")
 
     # --- Content ---
     for line in lines:
@@ -128,18 +133,11 @@ def draw_box(
         padded_line = pad_visible(line, inner_width)
 
         box_lines.append(
-            color
-            + "║"
-            + (" " * padding)
-            + padded_line
-            + (" " * padding)
-            + color
-            + "║"
-            + Style.RESET_ALL
+            f"{color}║{' ' * padding}{padded_line}{' ' * padding}{color}║{COLOR_RESET}"
         )
 
     # --- Bottom Border ---
-    box_lines.append(color + "╚" + "═" * (width - 2) + "╝" + Style.RESET_ALL)
+    box_lines.append(f"{color}╚{'═' * (width - 2)}╝{COLOR_RESET}")
     return box_lines
 
 
@@ -173,13 +171,12 @@ def display_pokemon_stats(pokemon: Pokemon, is_opponent: bool = False) -> list[s
 
     filled_length = int(hp_bar_length * hp_percentage)
 
-    # --- FIXED: Use solid block with Dark Gray color for the empty part ---
     hp_bar = (
         hp_color
         + "█" * filled_length
         + COLOR_HP_EMPTY  # Dark Gray
         + "█" * (hp_bar_length - filled_length)  # Solid block
-        + Style.RESET_ALL
+        + COLOR_RESET
     )
 
     hp_line = f"HP: {hp_bar} {current_hp}/{max_hp}"
@@ -229,12 +226,12 @@ def display_message_box(messages: deque) -> list[str]:
     )
 
     for msg in display_msgs:
-        box_content.append(f"{COLOR_MESSAGE}{msg}{Style.RESET_ALL}")
+        box_content.append(f"{COLOR_MESSAGE}{msg}{COLOR_RESET}")
 
     while len(box_content) < visible_lines:
         box_content.append("")
 
-    return draw_box(box_content, title="Messages", color=Fore.YELLOW)
+    return draw_box(box_content, title="Messages", color=COLOR_WARNING)
 
 
 def display_action_menu(
@@ -252,7 +249,7 @@ def display_action_menu(
         else:
             menu_lines.append(f"{COLOR_MENU}  {prefix}{action_str}{Style.RESET_ALL}")
 
-    return draw_box(menu_lines, title="Actions", color=Fore.BLUE)
+    return draw_box(menu_lines, title="Actions", color=COLOR_MENU)
 
 
 def play_ui(battle: Battle, agent_0: BaseAgent, agent_1: BaseAgent):
@@ -359,11 +356,11 @@ def play_ui(battle: Battle, agent_0: BaseAgent, agent_1: BaseAgent):
 
                     key = readchar.readkey()
 
-                    if key == readchar.key.UP:
+                    if key == KEY_UP:
                         selected_index = (selected_index - 1) % len(possible_actions)
-                    elif key == readchar.key.DOWN:
+                    elif key == KEY_DOWN:
                         selected_index = (selected_index + 1) % len(possible_actions)
-                    elif key == readchar.key.ENTER:
+                    elif key == KEY_ENTER:
                         action_0 = possible_actions[selected_index]
                     elif key == "q" or key == "\x03":
                         add_message(
@@ -414,4 +411,4 @@ def play_ui(battle: Battle, agent_0: BaseAgent, agent_1: BaseAgent):
         pass
     finally:
         show_cursor()
-        print(Style.RESET_ALL)
+        print(COLOR_RESET)

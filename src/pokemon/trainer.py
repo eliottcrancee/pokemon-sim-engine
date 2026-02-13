@@ -1,5 +1,3 @@
-# trainer.py
-
 from __future__ import annotations
 
 from pokemon.item import Item, ItemRegistry

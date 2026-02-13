@@ -24,6 +24,83 @@ class Action:
     item_id: int | None = None
     target_index: int | None = None
 
+    def __post_init__(self) -> None:
+        """Validate the action payload against its type.
+
+        This prevents constructing invalid actions such as ATTACK with
+        move_slot_index=None, which would otherwise become runtime errors
+        when used as list indices.
+        """
+
+        match self.action_type:
+            case ActionType.ATTACK:
+                if self.move_slot_index is None:
+                    raise ValueError("ATTACK action requires move_slot_index")
+                if (
+                    self.pokemon_index is not None
+                    or self.item_id is not None
+                    or self.target_index is not None
+                ):
+                    raise ValueError(
+                        "ATTACK action cannot have pokemon_index/item_id/target_index"
+                    )
+            case ActionType.SWITCH:
+                if self.pokemon_index is None:
+                    raise ValueError("SWITCH action requires pokemon_index")
+                if (
+                    self.move_slot_index is not None
+                    or self.item_id is not None
+                    or self.target_index is not None
+                ):
+                    raise ValueError(
+                        "SWITCH action cannot have move_slot_index/item_id/target_index"
+                    )
+            case ActionType.USE_ITEM:
+                if self.item_id is None or self.target_index is None:
+                    raise ValueError(
+                        "USE_ITEM action requires item_id and target_index"
+                    )
+                if self.move_slot_index is not None or self.pokemon_index is not None:
+                    raise ValueError(
+                        "USE_ITEM action cannot have move_slot_index/pokemon_index"
+                    )
+            case ActionType.PASS:
+                if (
+                    self.move_slot_index is not None
+                    or self.pokemon_index is not None
+                    or self.item_id is not None
+                    or self.target_index is not None
+                ):
+                    raise ValueError(
+                        "PASS action cannot have move_slot_index/pokemon_index/item_id/target_index"
+                    )
+            case _:
+                raise ValueError(f"Unknown action type: {self.action_type}")
+
+    @property
+    def attack_move_slot_index(self) -> int:
+        if self.action_type != ActionType.ATTACK or self.move_slot_index is None:
+            raise ValueError("Not an ATTACK action")
+        return self.move_slot_index
+
+    @property
+    def switch_pokemon_index(self) -> int:
+        if self.action_type != ActionType.SWITCH or self.pokemon_index is None:
+            raise ValueError("Not a SWITCH action")
+        return self.pokemon_index
+
+    @property
+    def use_item_id(self) -> int:
+        if self.action_type != ActionType.USE_ITEM or self.item_id is None:
+            raise ValueError("Not a USE_ITEM action")
+        return self.item_id
+
+    @property
+    def use_item_target_index(self) -> int:
+        if self.action_type != ActionType.USE_ITEM or self.target_index is None:
+            raise ValueError("Not a USE_ITEM action")
+        return self.target_index
+
     def __str__(self) -> str:
         """Return a string representation of the action."""
         if self.action_type == ActionType.ATTACK:

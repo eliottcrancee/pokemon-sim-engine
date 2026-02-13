@@ -1,43 +1,24 @@
-# tests/test_performance.py
+from __future__ import annotations
 
 import time
 
 from joblib import Parallel, cpu_count, delayed
 
+from pokemon import config as pokemon_config
 from pokemon.agents import FirstAgent
 from pokemon.battle import Battle
-from pokemon.item import Items
-from pokemon.pokemon import Pokedex, Pokemon
-from pokemon.trainer import Trainer
+from pokemon.battle_registry import BattleRegistry
 
-
-def create_trainer(name):
-    return Trainer(
-        name=name,
-        pokemon_team=[
-            Pokemon(species=Pokedex.Pikachu, level=10),
-            Pokemon(species=Pokedex.Charmander, level=10),
-            Pokemon(species=Pokedex.Squirtle, level=10),
-        ],
-        inventory={
-            Items.Potion: 1,
-            Items.SuperPotion: 1,
-        },
-    )
-
-
-def create_battle():
-    ash = create_trainer("Ash")
-    gary = create_trainer("Gary")
-    battle = Battle((ash, gary), max_rounds=100)
-    return battle
+BASELINE_BATTLE = "sinnoh_opening_sparks"
 
 
 def test_performance_battle_turns(benchmark):
     """Benchmarks how many turns of a battle can be run per second."""
     agent_0 = FirstAgent()
     agent_1 = FirstAgent()
-    battle = create_battle()
+    battle = BattleRegistry.get(BASELINE_BATTLE)
+    if battle is None:
+        raise AssertionError(f"BattleRegistry scenario '{BASELINE_BATTLE}' not found")
 
     def run_turn():
         if battle.done:
@@ -50,10 +31,14 @@ def test_performance_battle_turns(benchmark):
     benchmark(run_turn)
 
 
-def battle_worker(duration: int, battle: Battle = None) -> int:
+def battle_worker(duration: int, battle: Battle | None = None) -> int:
     """Worker function to run continuous battle turns for a specified duration
     and report the total number of turns completed.
     """
+    if battle is None:
+        battle = BattleRegistry.get(BASELINE_BATTLE)
+        if battle is None:
+            raise ValueError(f"BattleRegistry scenario '{BASELINE_BATTLE}' not found")
     agent_0 = FirstAgent()
     agent_1 = FirstAgent()
 
@@ -78,10 +63,16 @@ def battle_worker(duration: int, battle: Battle = None) -> int:
     return turns_count
 
 
-def battle_worker_timed(n_runs: int, battle: Battle = None) -> int:
+def battle_worker_timed(
+    n_runs: int, battle: Battle | None = None
+) -> tuple[float, float, float]:
     """Worker function to run continuous battle turns for a specified duration
     and report the total number of turns completed.
     """
+    if battle is None:
+        battle = BattleRegistry.get(BASELINE_BATTLE)
+        if battle is None:
+            raise ValueError(f"BattleRegistry scenario '{BASELINE_BATTLE}' not found")
     agent_0 = FirstAgent()
     agent_1 = FirstAgent()
 
@@ -113,14 +104,15 @@ def battle_worker_timed(n_runs: int, battle: Battle = None) -> int:
         f"Reset Time: {reset_time:.6f}s, Action Time: {action_time:.6f}s, Turn Time: {turn_time:.6f}s"
     )
 
+    return reset_time, action_time, turn_time
 
-def parallel_stress_test_turns(duration: int = 20):
+
+def parallel_stress_test_turns(duration: int = 20) -> None:
     """Performs a parallel stress test to determine the maximum number of battle
     turns possible across all CPU cores within a specified duration.
     """
 
-    global DEBUG
-    DEBUG = False  # Disable debug mode for performance testing
+    pokemon_config.DEBUG = False  # Disable debug mode for performance testing
     num_process = cpu_count()
 
     print("\n--- Parallel Battle Turn Stress Test ---")
@@ -129,11 +121,11 @@ def parallel_stress_test_turns(duration: int = 20):
 
     start_time = time.perf_counter()
     results = Parallel(n_jobs=num_process)(
-        delayed(battle_worker)(duration, create_battle()) for _ in range(num_process)
+        delayed(battle_worker)(duration) for _ in range(num_process)
     )
     end_time = time.perf_counter()
 
-    total_turns = sum(results)
+    total_turns = sum(r for r in results if isinstance(r, int))
 
     print(f"Test completed in {end_time - start_time:.2f} seconds.")
     print(f"Total turns completed across all {num_process} processes: {total_turns:,}")

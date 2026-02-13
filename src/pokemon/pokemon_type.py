@@ -203,7 +203,7 @@ _EFFECTIVENESS_CHART: Final[tuple[tuple[float, ...], ...]] = (
 )
 
 
-def _build_effectiveness_chart_3d() -> tuple[tuple[float, ...], ...]:
+def _build_effectiveness_chart_3d() -> tuple[tuple[tuple[float, ...], ...], ...]:
     """
     Builds a 3D immutable matrix of float multipliers.
     Dimensions: Attacker x Defender1 x Defender2.
@@ -221,7 +221,7 @@ def _build_effectiveness_chart_3d() -> tuple[tuple[float, ...], ...]:
     return tuple(tuple(tuple(row) for row in plane) for plane in matrix)
 
 
-_EFFECTIVENESS_CHART_3D: Final[tuple[tuple[float, ...], ...]] = (
+_EFFECTIVENESS_CHART_3D: Final[tuple[tuple[tuple[float, ...], ...], ...]] = (
     _build_effectiveness_chart_3d()
 )
 
@@ -231,6 +231,7 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import numpy as np
     import seaborn as sns
+    from matplotlib.patches import Rectangle
 
     # 1. Prepare Data
     # Convert the tuple-of-tuples to a numpy array for plotting
@@ -275,10 +276,10 @@ if __name__ == "__main__":
 
     # 5. Custom Legend (Since we hid the colorbar)
     legend_elements = [
-        plt.Rectangle((0, 0), 1, 1, color="#7f8c8d", label="0x (Immune)"),
-        plt.Rectangle((0, 0), 1, 1, color="#e74c3c", label="0.5x (Resist)"),
-        plt.Rectangle((0, 0), 1, 1, color="#ecf0f1", label="1x (Neutral)"),
-        plt.Rectangle((0, 0), 1, 1, color="#2ecc71", label="2x (Weakness)"),
+        Rectangle((0, 0), 1, 1, color="#7f8c8d", label="0x (Immune)"),
+        Rectangle((0, 0), 1, 1, color="#e74c3c", label="0.5x (Resist)"),
+        Rectangle((0, 0), 1, 1, color="#ecf0f1", label="1x (Neutral)"),
+        Rectangle((0, 0), 1, 1, color="#2ecc71", label="2x (Weakness)"),
     ]
     plt.legend(handles=legend_elements, loc="upper right", bbox_to_anchor=(1.2, 1))
 

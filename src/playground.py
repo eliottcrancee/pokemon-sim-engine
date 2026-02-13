@@ -1,10 +1,10 @@
 import time
 import timeit
+from typing import Any
 
 from tqdm import tqdm
 
 from pokemon.agents import (
-    AlphaBetaAgent,
     BaseAgent,
     BestAttackAgent,
     BestAttackAndPotionAgent,
@@ -19,7 +19,7 @@ from pokemon.battle_registry import BattleRegistry
 from pokemon.play import play_multiple, play_tournament
 from pokemon.ui import play_ui
 
-AGENT_POOL = [
+AGENT_POOL: list[BaseAgent] = [
     RandomAgent(),
     RandomAttackAgent(),
     BestAttackAgent(),
@@ -30,7 +30,7 @@ AGENT_POOL = [
 ]
 
 
-def select_from_list(prompt: str, options: list[str]) -> str:
+def select_from_list(prompt: str, options: list[Any]) -> int:
     """Generic helper to select an item from a list by its index."""
     print(prompt)
     for i, option in enumerate(options, 1):
@@ -69,9 +69,12 @@ def select_battle_verbose() -> tuple[str, "Battle"]:
     Returns the name of the battle and the Battle object.
     """
     battle_names = BattleRegistry.list_battles()
-    descriptions = [
-        get_battle_description(BattleRegistry.get(name)) for name in battle_names
-    ]
+    descriptions = []
+    for name in battle_names:
+        battle = BattleRegistry.get(name)
+        if battle is None:
+            raise ValueError(f"Battle '{name}' not found in registry.")
+        descriptions.append(get_battle_description(battle))
 
     print("\nChoose a battle scenario:")
     for i, name in enumerate(battle_names, 1):
@@ -82,7 +85,10 @@ def select_battle_verbose() -> tuple[str, "Battle"]:
             choice = int(input("> "))
             if 1 <= choice <= len(battle_names):
                 selected_name = battle_names[choice - 1]
-                return selected_name, BattleRegistry.get(selected_name)
+                selected_battle = BattleRegistry.get(selected_name)
+                if selected_battle is None:
+                    raise ValueError(f"Battle '{selected_name}' not found in registry.")
+                return selected_name, selected_battle
             else:
                 print("Invalid choice. Please try again.")
         except ValueError:

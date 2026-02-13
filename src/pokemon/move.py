@@ -264,7 +264,10 @@ class StatMove(Move):
         if self.is_accuracy_modifier:
             success = affected.apply_accuracy_modifier(self.stages)
         else:
-            success = affected.apply_modifier(self.stat_index, self.stages)
+            stat_index = self.stat_index
+            if stat_index is None:
+                raise ValueError("StatMove has no valid stat index.")
+            success = affected.apply_modifier(stat_index, self.stages)
 
         stat_name_for_message = self._stat_name
 
@@ -564,34 +567,84 @@ Crunch = MoveRegistry.register(
     SimpleMove("Crunch", MoveCategory.PHYSICAL, PokemonType.DARK, 80, 100, 15)
 )
 MachPunch = MoveRegistry.register(
-    SimpleMove("Mach Punch", MoveCategory.PHYSICAL, PokemonType.FIGHTING, 40, 100, 30, priority=1)
+    SimpleMove(
+        "Mach Punch",
+        MoveCategory.PHYSICAL,
+        PokemonType.FIGHTING,
+        40,
+        100,
+        30,
+        priority=1,
+    )
 )
 AquaJet = MoveRegistry.register(
-    SimpleMove("Aqua Jet", MoveCategory.PHYSICAL, PokemonType.WATER, 40, 100, 20, priority=1)
+    SimpleMove(
+        "Aqua Jet", MoveCategory.PHYSICAL, PokemonType.WATER, 40, 100, 20, priority=1
+    )
 )
 IceShard = MoveRegistry.register(
-    SimpleMove("Ice Shard", MoveCategory.PHYSICAL, PokemonType.ICE, 40, 100, 30, priority=1)
+    SimpleMove(
+        "Ice Shard", MoveCategory.PHYSICAL, PokemonType.ICE, 40, 100, 30, priority=1
+    )
 )
 ShadowClaw = MoveRegistry.register(
     SimpleMove("Shadow Claw", MoveCategory.PHYSICAL, PokemonType.GHOST, 70, 100, 15)
 )
 PoisonSting = MoveRegistry.register(
     ApplyStatusMove(
-        "Poison Sting", MoveCategory.PHYSICAL, PokemonType.POISON, 15, 100, 35,
-        status_to_apply=PokemonStatus.POISON, effect_chance=0.3
+        "Poison Sting",
+        MoveCategory.PHYSICAL,
+        PokemonType.POISON,
+        15,
+        100,
+        35,
+        status_to_apply=PokemonStatus.POISON,
+        effect_chance=0.3,
     )
 )
 BraveBird = MoveRegistry.register(
-    RecoilMove("Brave Bird", MoveCategory.PHYSICAL, PokemonType.FLYING, 120, 100, 15, recoil_ratio=0.33)
+    RecoilMove(
+        "Brave Bird",
+        MoveCategory.PHYSICAL,
+        PokemonType.FLYING,
+        120,
+        100,
+        15,
+        recoil_ratio=0.33,
+    )
 )
 WoodHammer = MoveRegistry.register(
-    RecoilMove("Wood Hammer", MoveCategory.PHYSICAL, PokemonType.GRASS, 120, 100, 15, recoil_ratio=0.33)
+    RecoilMove(
+        "Wood Hammer",
+        MoveCategory.PHYSICAL,
+        PokemonType.GRASS,
+        120,
+        100,
+        15,
+        recoil_ratio=0.33,
+    )
 )
 FlareBlitz = MoveRegistry.register(
-    RecoilMove("Flare Blitz", MoveCategory.PHYSICAL, PokemonType.FIRE, 120, 100, 15, recoil_ratio=0.33)
+    RecoilMove(
+        "Flare Blitz",
+        MoveCategory.PHYSICAL,
+        PokemonType.FIRE,
+        120,
+        100,
+        15,
+        recoil_ratio=0.33,
+    )
 )
 WildCharge = MoveRegistry.register(
-    RecoilMove("Wild Charge", MoveCategory.PHYSICAL, PokemonType.ELECTRIC, 90, 100, 15, recoil_ratio=0.25)
+    RecoilMove(
+        "Wild Charge",
+        MoveCategory.PHYSICAL,
+        PokemonType.ELECTRIC,
+        90,
+        100,
+        15,
+        recoil_ratio=0.25,
+    )
 )
 LowKick = MoveRegistry.register(
     SimpleMove("Low Kick", MoveCategory.PHYSICAL, PokemonType.FIGHTING, 50, 100, 20)
@@ -610,8 +663,14 @@ Uturn = MoveRegistry.register(
 )
 Spark = MoveRegistry.register(
     ApplyStatusMove(
-        "Spark", MoveCategory.PHYSICAL, PokemonType.ELECTRIC, 65, 100, 20,
-        status_to_apply=PokemonStatus.PARALYSIS, effect_chance=0.3
+        "Spark",
+        MoveCategory.PHYSICAL,
+        PokemonType.ELECTRIC,
+        65,
+        100,
+        20,
+        status_to_apply=PokemonStatus.PARALYSIS,
+        effect_chance=0.3,
     )
 )
 
@@ -636,8 +695,14 @@ WaterGun = MoveRegistry.register(
 )
 Flamethrower = MoveRegistry.register(
     ApplyStatusMove(
-        "Flamethrower", MoveCategory.SPECIAL, PokemonType.FIRE, 90, 100, 15,
-        status_to_apply=PokemonStatus.BURN, effect_chance=0.1
+        "Flamethrower",
+        MoveCategory.SPECIAL,
+        PokemonType.FIRE,
+        90,
+        100,
+        15,
+        status_to_apply=PokemonStatus.BURN,
+        effect_chance=0.1,
     )
 )
 HydroPump = MoveRegistry.register(
@@ -645,8 +710,14 @@ HydroPump = MoveRegistry.register(
 )
 Thunderbolt = MoveRegistry.register(
     ApplyStatusMove(
-        "Thunderbolt", MoveCategory.SPECIAL, PokemonType.ELECTRIC, 90, 100, 15,
-        status_to_apply=PokemonStatus.PARALYSIS, effect_chance=0.1
+        "Thunderbolt",
+        MoveCategory.SPECIAL,
+        PokemonType.ELECTRIC,
+        90,
+        100,
+        15,
+        status_to_apply=PokemonStatus.PARALYSIS,
+        effect_chance=0.1,
     )
 )
 Psychic = MoveRegistry.register(
@@ -660,8 +731,14 @@ HyperBeam = MoveRegistry.register(
 )
 Blizzard = MoveRegistry.register(
     ApplyStatusMove(
-        "Blizzard", MoveCategory.SPECIAL, PokemonType.ICE, 110, 70, 5,
-        status_to_apply=PokemonStatus.FREEZE, effect_chance=0.1
+        "Blizzard",
+        MoveCategory.SPECIAL,
+        PokemonType.ICE,
+        110,
+        70,
+        5,
+        status_to_apply=PokemonStatus.FREEZE,
+        effect_chance=0.1,
     )
 )
 DragonRage = MoveRegistry.register(
@@ -674,7 +751,9 @@ Bubble = MoveRegistry.register(
     SimpleMove("Bubble", MoveCategory.SPECIAL, PokemonType.WATER, 40, 100, 30)
 )
 AuraSphere = MoveRegistry.register(
-    SimpleMove("Aura Sphere", MoveCategory.SPECIAL, PokemonType.FIGHTING, 80, 101, 20) # 101 Accuracy for 'never miss'
+    SimpleMove(
+        "Aura Sphere", MoveCategory.SPECIAL, PokemonType.FIGHTING, 80, 101, 20
+    )  # 101 Accuracy for 'never miss'
 )
 DragonPulse = MoveRegistry.register(
     SimpleMove("Dragon Pulse", MoveCategory.SPECIAL, PokemonType.DRAGON, 85, 100, 10)
@@ -684,8 +763,14 @@ FlashCannon = MoveRegistry.register(
 )
 IceBeam = MoveRegistry.register(
     ApplyStatusMove(
-        "Ice Beam", MoveCategory.SPECIAL, PokemonType.ICE, 90, 100, 10,
-        status_to_apply=PokemonStatus.FREEZE, effect_chance=0.1
+        "Ice Beam",
+        MoveCategory.SPECIAL,
+        PokemonType.ICE,
+        90,
+        100,
+        10,
+        status_to_apply=PokemonStatus.FREEZE,
+        effect_chance=0.1,
     )
 )
 TriAttack = MoveRegistry.register(
@@ -696,14 +781,26 @@ AirSlash = MoveRegistry.register(
 )
 FireBlast = MoveRegistry.register(
     ApplyStatusMove(
-        "Fire Blast", MoveCategory.SPECIAL, PokemonType.FIRE, 110, 85, 5,
-        status_to_apply=PokemonStatus.BURN, effect_chance=0.1
+        "Fire Blast",
+        MoveCategory.SPECIAL,
+        PokemonType.FIRE,
+        110,
+        85,
+        5,
+        status_to_apply=PokemonStatus.BURN,
+        effect_chance=0.1,
     )
 )
 Thunder = MoveRegistry.register(
     ApplyStatusMove(
-        "Thunder", MoveCategory.SPECIAL, PokemonType.ELECTRIC, 110, 70, 10,
-        status_to_apply=PokemonStatus.PARALYSIS, effect_chance=0.3
+        "Thunder",
+        MoveCategory.SPECIAL,
+        PokemonType.ELECTRIC,
+        110,
+        70,
+        10,
+        status_to_apply=PokemonStatus.PARALYSIS,
+        effect_chance=0.3,
     )
 )
 SpacialRend = MoveRegistry.register(
@@ -717,7 +814,12 @@ Judgment = MoveRegistry.register(
 )
 MudSlap = MoveRegistry.register(
     ApplyStatusMove(
-        "Mud-Slap", MoveCategory.SPECIAL, PokemonType.GROUND, 20, 100, 10,
+        "Mud-Slap",
+        MoveCategory.SPECIAL,
+        PokemonType.GROUND,
+        20,
+        100,
+        10,
         volatile_status="accuracy",
     )
 )

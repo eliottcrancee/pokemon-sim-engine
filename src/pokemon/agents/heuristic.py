@@ -5,6 +5,7 @@ from pokemon.battle import Battle
 from pokemon.item import ItemRegistry
 from pokemon.move import Move
 from pokemon.pokemon import Pokemon
+from pokemon.pokemon_status import PokemonStatus
 
 from .base_agent import BaseAgent
 
@@ -37,7 +38,7 @@ class RandomAttackAndPotionAgent(BaseAgent):
                 a
                 for a in actions
                 if a.action_type == ActionType.USE_ITEM
-                and "Potion" in ItemRegistry.get(a.item_id).name
+                and "Potion" in ItemRegistry.get(a.use_item_id).name
             ]
             if heal_actions:
                 return random.choice(heal_actions)
@@ -71,7 +72,7 @@ class BestAttackAgent(BaseAgent):
         pokemon = trainer.pokemon_team[0]
 
         def get_move_power(action: Action) -> int:
-            move = pokemon.move_slots[action.move_slot_index].move
+            move = pokemon.move_slots[action.attack_move_slot_index].move
             return move.power or 0
 
         return max(attack_actions, key=get_move_power)
@@ -104,7 +105,7 @@ class BestAttackAndPotionAgent(BaseAgent):
                 a
                 for a in actions
                 if a.action_type == ActionType.USE_ITEM
-                and "Potion" in ItemRegistry.get(a.item_id).name
+                and "Potion" in ItemRegistry.get(a.use_item_id).name
             ]
             if heal_actions:
                 return random.choice(heal_actions)
@@ -116,7 +117,7 @@ class BestAttackAndPotionAgent(BaseAgent):
         pokemon = trainer.pokemon_team[0]
 
         def get_move_power(action: Action) -> int:
-            move = pokemon.move_slots[action.move_slot_index].move
+            move = pokemon.move_slots[action.attack_move_slot_index].move
             return move.power or 0
 
         return max(attack_actions, key=get_move_power)
@@ -176,10 +177,11 @@ class SmarterHeuristicAgent(BaseAgent):
         user = battle.get_trainer_by_id(trainer_id).active_pokemon
         target = battle.get_trainer_by_id(1 - trainer_id).active_pokemon
 
-        if action.move_slot_index == -1:  # Struggle
+        move_slot_index = action.attack_move_slot_index
+        if move_slot_index == -1:  # Struggle
             return 1.0  # Low but non-zero score
 
-        move = user.move_slots[action.move_slot_index].move
+        move = user.move_slots[move_slot_index].move
         move: Move
         if move.power == 0:  # For now, ignore status moves
             return 0.0
@@ -202,7 +204,7 @@ class SmarterHeuristicAgent(BaseAgent):
         trainer = battle.get_trainer_by_id(trainer_id)
         opponent = battle.get_trainer_by_id(1 - trainer_id).active_pokemon
         current_pokemon = trainer.active_pokemon
-        new_pokemon = trainer.pokemon_team[action.pokemon_index]
+        new_pokemon = trainer.pokemon_team[action.switch_pokemon_index]
         new_pokemon: Pokemon
 
         # 1. Calculate opponent's offensive advantage against our current pokemon
@@ -245,8 +247,8 @@ class SmarterHeuristicAgent(BaseAgent):
     def _score_item(self, action: Action, battle: Battle, trainer_id: int) -> float:
         """Scores using a healing item."""
         trainer = battle.get_trainer_by_id(trainer_id)
-        item = ItemRegistry.get(action.item_id)
-        target = trainer.pokemon_team[action.target_index]
+        item = ItemRegistry.get(action.use_item_id)
+        target = trainer.pokemon_team[action.use_item_target_index]
         target: Pokemon
 
         # Only score healing items for now
@@ -264,7 +266,7 @@ class SmarterHeuristicAgent(BaseAgent):
             return 150
         if "Potion" in item.name:
             return 100
-        if "Full Heal" in item.name and target.status != "HEALTHY":
+        if "Full Heal" in item.name and target.status != PokemonStatus.HEALTHY:
             return 80  # Curing status is valuable
 
         return 0.0

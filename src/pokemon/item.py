@@ -6,7 +6,7 @@ from enum import IntEnum, unique
 from typing import TYPE_CHECKING
 
 from pokemon.message import Message
-from pokemon.pokemon import PokemonStatus
+from pokemon.pokemon_status import PokemonStatus
 
 if TYPE_CHECKING:
     from pokemon.pokemon import Pokemon
@@ -53,14 +53,14 @@ class HealHP(ItemEffect):
 
 @dataclass(frozen=True, slots=True)
 class HealStatus(ItemEffect):
-    status_list: list[tuple[PokemonStatus, ...]] | None = None  # None = All
+    status_list: tuple[PokemonStatus, ...] | None = None  # None = All
 
     def can_use(self, target: Pokemon) -> bool:
         if not target.is_alive:
             return False
         if target.status == PokemonStatus.HEALTHY:
             return False
-        if self.status_list and target.status not in self.status_list:
+        if self.status_list is not None and target.status not in self.status_list:
             return False
         return True
 
@@ -132,12 +132,15 @@ class ItemRegistry:
         return item
 
     @classmethod
-    def get(cls, name_or_id: str | int) -> Item | None:
+    def get(cls, name_or_id: str | int) -> Item:
         if isinstance(name_or_id, int):
             if 0 <= name_or_id < len(cls._items):
                 return cls._items[name_or_id]
-            return None
-        return cls._map.get(str(name_or_id).replace(" ", "").lower())
+        key = str(name_or_id).replace(" ", "").lower()
+        item = cls._map.get(key)
+        if item is None:
+            raise ItemError(f"Item '{name_or_id}' not found")
+        return item
 
     @classmethod
     def all(cls) -> list[Item]:
@@ -184,10 +187,7 @@ MaxRevive = ItemRegistry.register(
 
 class _ItemsMeta(type):
     def __getattr__(cls, name: str) -> Item:
-        item = ItemRegistry.get(name)
-        if item:
-            return item
-        raise AttributeError(f"Item '{name}' not found")
+        return ItemRegistry.get(name)
 
 
 class Items(metaclass=_ItemsMeta):

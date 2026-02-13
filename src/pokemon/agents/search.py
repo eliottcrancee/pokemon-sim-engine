@@ -1,4 +1,3 @@
-# src/pokemon/agents/search.py
 """This module defines agents that use search algorithms to make decisions."""
 
 import math
@@ -753,7 +752,7 @@ class MCTSNode:
     Represents a decision point for the Player.
     """
 
-    def __init__(self, parent, action: Action):
+    def __init__(self, parent: "MCTSNode | None", action: Action | None):
         self.parent = parent
         self.action = action  # The action YOU took to get here
         self.children: dict[str, MCTSNode] = {}  # Map Action string -> Node
@@ -860,6 +859,8 @@ class MCTSAgent(BaseAgent):
                 # Apply the move associated with the child node
                 # AND simulate an opponent move to advance the state
                 my_action = node.action
+                if my_action is None:
+                    break
                 op_action = self._get_heuristic_opponent_move(
                     sim_battle, 1 - trainer_id
                 )
@@ -920,6 +921,8 @@ class MCTSAgent(BaseAgent):
             return random.choice(battle.get_possible_actions(trainer_id))
 
         best_child = max(root.children.values(), key=lambda n: n.visits)
+        if best_child.action is None:
+            return random.choice(battle.get_possible_actions(trainer_id))
 
         if verbose:
             win_rate = best_child.value / best_child.visits
@@ -977,8 +980,9 @@ class MCTSAgent(BaseAgent):
             # Prefer higher power moves slightly
             return max(
                 attacks,
-                key=lambda a: self._get_move_power(battle, trainer_id, a)
-                + random.uniform(0, 40),
+                key=lambda a: (
+                    self._get_move_power(battle, trainer_id, a) + random.uniform(0, 40)
+                ),
             )
 
         return random.choice(actions)
@@ -1003,10 +1007,11 @@ class MCTSAgent(BaseAgent):
         return random.choice(actions)
 
     def _get_move_power(self, battle: Battle, trainer_id: int, action: Action):
-        if action.move_slot_index == -1:
+        move_slot_index = action.attack_move_slot_index
+        if move_slot_index == -1:
             return 40  # Struggle power
         return (
             battle.trainers[trainer_id]
-            .active_pokemon.move_slots[action.move_slot_index]
+            .active_pokemon.move_slots[move_slot_index]
             .move.power
         )

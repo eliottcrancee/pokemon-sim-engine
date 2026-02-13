@@ -1,8 +1,6 @@
-# tests/test_trainer.py
-
 import pytest
 
-from pokemon.item import Items, Potion
+from pokemon.item import Items
 from pokemon.pokemon import Pokedex, Pokemon
 from pokemon.trainer import Trainer, TrainerError
 
@@ -11,9 +9,9 @@ from pokemon.trainer import Trainer, TrainerError
 def sample_trainer() -> Trainer:
     """Fixture to create a sample trainer for testing."""
     return Trainer(
-        name="Ash",
+        name="Dawn",
         pokemon_team=[
-            Pokemon(species=Pokedex.Pikachu, level=10),
+            Pokemon(species=Pokedex.Shinx, level=10),
             Pokemon(species=Pokedex.Chimchar, level=12),
         ],
         inventory={Items.Potion: 2, Items.Revive: 1},
@@ -22,9 +20,9 @@ def sample_trainer() -> Trainer:
 
 def test_trainer_initialization(sample_trainer: Trainer):
     """Tests the basic initialization of a Trainer."""
-    assert sample_trainer.name == "Ash"
+    assert sample_trainer.name == "Dawn"
     assert len(sample_trainer.pokemon_team) == 2
-    assert sample_trainer.active_pokemon.species.name == "Pikachu"
+    assert sample_trainer.active_pokemon.species.name == "Shinx"
     assert sample_trainer.get_item_quantity(Items.Potion) == 2
     assert sample_trainer.get_item_quantity(Items.Revive) == 1
     assert sample_trainer.get_item_quantity(Items.SuperPotion) == 0

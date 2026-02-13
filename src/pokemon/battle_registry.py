@@ -1,5 +1,3 @@
-# src/pokemon/battle_registry.py
-
 from __future__ import annotations
 
 from pokemon.battle import Battle
@@ -81,179 +79,149 @@ class BattleRegistry:
         return list(cls._battles.keys())
 
 
-# --- Pre-defined Battle Scenarios ---
+# --- Pre-defined Battle Scenarios (Gen 4 focused) ---
 
-# Kanto Classic: A simple 1v1 between two iconic Pokemon
+# Early-route style duel with status pressure and priority finisher.
 BattleRegistry.register(
-    "kanto_classic",
+    "sinnoh_opening_sparks",
     trainer1_def={
-        "name": "Ash",
+        "name": "Dawn",
         "team": [
             {
-                "species": "Pikachu",
-                "level": 50,
-                "moves": ["Thunderbolt", "Quick Attack", "Tail Whip", "Thunder Wave"],
+                "species": "Shinx",
+                "level": 18,
+                "moves": ["Spark", "Bite", "Thunder Wave", "Quick Attack"],
             }
         ],
-        "inventory": {"Super Potion": 1},
+        "inventory": {"Potion": 1},
     },
     trainer2_def={
-        "name": "Gary",
+        "name": "Lucas",
         "team": [
             {
-                "species": "Eevee",
-                "level": 50,
-                "moves": ["Tackle", "Bite", "Sand Attack"],
+                "species": "Starly",
+                "level": 18,
+                "moves": ["Wing Attack", "Quick Attack", "Tackle", "Growl"],
             }
         ],
-        "inventory": {"Super Potion": 1},
+        "inventory": {"Potion": 1},
     },
 )
 
-# Mirror Match 6v6: A perfectly symmetrical battle with full teams.
+# Starter final forms in a triangle matchup; switching and coverage are key.
 BattleRegistry.register(
-    "mirror_match_6v6",
+    "sinnoh_starter_triangle",
     trainer1_def={
-        "name": "Player 1",
+        "name": "Barry",
         "team": [
             {
-                "species": "Arcanine",
-                "level": 75,
-                "moves": ["Flamethrower", "Extreme Speed", "Bite"],
+                "species": "Infernape",
+                "level": 58,
+                "moves": ["Flare Blitz", "Mach Punch", "U-turn", "Low Kick"],
             },
             {
-                "species": "Gyarados",
-                "level": 75,
-                "moves": ["Hydro Pump", "Bite", "Taunt"],
+                "species": "Empoleon",
+                "level": 58,
+                "moves": ["Hydro Pump", "Flash Cannon", "Ice Beam", "Aqua Jet"],
             },
             {
-                "species": "Exeggutor",
-                "level": 75,
-                "moves": ["Psychic", "Solar Beam", "Sleep Powder"],
-            },
-            {
-                "species": "Rhydon",
-                "level": 75,
-                "moves": ["Earthquake", "Rock Slide", "Body Slam"],
-            },
-            {
-                "species": "Alakazam",
-                "level": 75,
-                "moves": ["Psychic", "Thunder Wave", "Tackle"],
-            },
-            {
-                "species": "Snorlax",
-                "level": 75,
-                "moves": ["Body Slam", "Hyper Beam", "Pound"],
-            },
-        ],
-        "inventory": {"Hyper Potion": 2, "Full Heal": 2},
-    },
-    trainer2_def={
-        "name": "Player 2",
-        "team": [
-            {
-                "species": "Arcanine",
-                "level": 75,
-                "moves": ["Flamethrower", "Extreme Speed", "Bite"],
-            },
-            {
-                "species": "Gyarados",
-                "level": 75,
-                "moves": ["Hydro Pump", "Bite", "Taunt"],
-            },
-            {
-                "species": "Exeggutor",
-                "level": 75,
-                "moves": ["Psychic", "Solar Beam", "Sleep Powder"],
-            },
-            {
-                "species": "Rhydon",
-                "level": 75,
-                "moves": ["Earthquake", "Rock Slide", "Body Slam"],
-            },
-            {
-                "species": "Alakazam",
-                "level": 75,
-                "moves": ["Psychic", "Thunder Wave", "Tackle"],
-            },
-            {
-                "species": "Snorlax",
-                "level": 75,
-                "moves": ["Body Slam", "Hyper Beam", "Pound"],
-            },
-        ],
-        "inventory": {"Hyper Potion": 2, "Full Heal": 2},
-    },
-)
-
-# Type Triangle Tussle: A 3v3 battle to test strategic switching.
-BattleRegistry.register(
-    "type_triangle_tussle",
-    trainer1_def={
-        "name": "Green",
-        "team": [
-            {
-                "species": "Venosaur",
-                "level": 50,
-                "moves": ["Solar Beam", "Sleep Powder", "Razor Leaf"],
-            },
-            {
-                "species": "Arcanine",
-                "level": 50,
-                "moves": ["Flamethrower", "Extreme Speed", "Bite"],
-            },
-            {
-                "species": "Lapras",
-                "level": 50,
-                "moves": ["Blizzard", "Hydro Pump", "Body Slam"],
+                "species": "Torterra",
+                "level": 58,
+                "moves": ["Wood Hammer", "Earthquake", "Crunch", "Solar Beam"],
             },
         ],
         "inventory": {"Super Potion": 2, "Full Heal": 1},
     },
     trainer2_def={
-        "name": "Red",
+        "name": "Rival",
         "team": [
             {
-                "species": "Charizard",
-                "level": 50,
-                "moves": ["Flamethrower", "Wing Attack", "Slash"],
+                "species": "Torterra",
+                "level": 58,
+                "moves": ["Earthquake", "Wood Hammer", "Crunch", "Razor Leaf"],
             },
             {
-                "species": "Blastoise",
-                "level": 50,
-                "moves": ["Hydro Pump", "Skull Bash", "Bite"],
+                "species": "Infernape",
+                "level": 58,
+                "moves": ["Flamethrower", "Mach Punch", "U-turn", "Extreme Speed"],
             },
             {
-                "species": "Exeggutor",
-                "level": 50,
-                "moves": ["Psychic", "Solar Beam", "Tackle"],
+                "species": "Empoleon",
+                "level": 58,
+                "moves": ["Hydro Pump", "Ice Beam", "Flash Cannon", "Bubble"],
             },
         ],
         "inventory": {"Super Potion": 2, "Full Heal": 1},
     },
 )
 
-# Brain vs. Brawn: A 3v3 battle of Physical vs. Special attackers.
+# Midgame tactical battle with hazards-like pressure, pivoting and speed control.
 BattleRegistry.register(
-    "brain_vs_brawn",
+    "midgame_pivot_pressure",
+    trainer1_def={
+        "name": "Ace Trainer Maylene",
+        "team": [
+            {
+                "species": "Hippopotas",
+                "level": 42,
+                "moves": ["Sand Attack", "Body Slam", "Bite", "Tackle"],
+            },
+            {
+                "species": "Luxray",
+                "level": 42,
+                "moves": ["Wild Charge", "Bite", "Thunderbolt", "Body Slam"],
+            },
+            {
+                "species": "Staraptor",
+                "level": 42,
+                "moves": ["U-turn", "Brave Bird", "Quick Attack", "Take Down"],
+            },
+        ],
+        "inventory": {"Super Potion": 2},
+    },
+    trainer2_def={
+        "name": "Ace Trainer Volkner",
+        "team": [
+            {
+                "species": "Magnezone",
+                "level": 42,
+                "moves": ["Thunderbolt", "Flash Cannon", "Tri Attack", "Thunder Shock"],
+            },
+            {
+                "species": "Garchomp",
+                "level": 42,
+                "moves": ["Dragon Rush", "Earthquake", "Crunch", "Sand Attack"],
+            },
+            {
+                "species": "Togekiss",
+                "level": 42,
+                "moves": ["Air Slash", "Nasty Plot", "Aura Sphere", "Thunder Wave"],
+            },
+        ],
+        "inventory": {"Super Potion": 2},
+    },
+)
+
+# Physical offense versus special offense style clash.
+BattleRegistry.register(
+    "brain_vs_brawn_gen4",
     trainer1_def={
         "name": "Brawn",
         "team": [
             {
-                "species": "Rhydon",
+                "species": "Rhyperior",
                 "level": 52,
-                "moves": ["Earthquake", "Rock Slide", "Body Slam"],
+                "moves": ["Earthquake", "Rock Slide", "Stone Edge", "Megahorn"],
             },
             {
-                "species": "Snorlax",
+                "species": "Garchomp",
                 "level": 52,
-                "moves": ["Body Slam", "Hyper Beam", "Skull Bash"],
+                "moves": ["Dragon Rush", "Earthquake", "Crunch", "Take Down"],
             },
             {
-                "species": "Gyarados",
+                "species": "Staraptor",
                 "level": 52,
-                "moves": ["Taunt", "Bite", "Hydro Pump"],
+                "moves": ["Brave Bird", "Quick Attack", "U-turn", "Take Down"],
             },
         ],
         "inventory": {"Hyper Potion": 2},
@@ -262,112 +230,169 @@ BattleRegistry.register(
         "name": "Brain",
         "team": [
             {
-                "species": "Alakazam",
+                "species": "Lucario",
                 "level": 52,
-                "moves": ["Psychic", "Thunder Wave", "Tackle"],
+                "moves": [
+                    "Aura Sphere",
+                    "Dragon Pulse",
+                    "Flash Cannon",
+                    "Extreme Speed",
+                ],
             },
             {
-                "species": "Pikachu",
+                "species": "Magnezone",
                 "level": 52,
-                "moves": ["Thunderbolt", "Thunder Shock", "Quick Attack"],
+                "moves": ["Thunderbolt", "Flash Cannon", "Tri Attack", "Thunder"],
             },
             {
-                "species": "Exeggutor",
+                "species": "Togekiss",
                 "level": 52,
-                "moves": ["Psychic", "Solar Beam", "Tackle"],
+                "moves": ["Air Slash", "Aura Sphere", "Nasty Plot", "Thunder Wave"],
             },
         ],
         "inventory": {"Hyper Potion": 2},
     },
 )
 
-# Full Team Battle: A 6v6 battle with more complex teams
+# Champion-level full teams with mixed offensive/defensive options.
 BattleRegistry.register(
-    "full_team_6v6",
+    "sinnoh_champion_clash_6v6",
     trainer1_def={
-        "name": "Red",
+        "name": "Cynthia",
         "team": [
             {
-                "species": "Pikachu",
+                "species": "Garchomp",
                 "level": 88,
-                "moves": ["Thunderbolt", "Quick Attack", "Iron Tail"],
+                "moves": ["Dragon Rush", "Earthquake", "Crunch", "Sand Attack"],
             },
             {
-                "species": "Charizard",
+                "species": "Infernape",
                 "level": 84,
-                "moves": ["Flamethrower", "Wing Attack", "Slash"],
+                "moves": ["Flare Blitz", "Mach Punch", "U-turn", "Low Kick"],
             },
             {
-                "species": "Blastoise",
+                "species": "Empoleon",
                 "level": 84,
-                "moves": ["Hydro Pump", "Skull Bash", "Bite"],
+                "moves": ["Hydro Pump", "Flash Cannon", "Ice Beam", "Aqua Jet"],
             },
             {
-                "species": "Venosaur",
+                "species": "Torterra",
                 "level": 84,
-                "moves": ["Solar Beam", "Razor Leaf", "Sleep Powder"],
+                "moves": ["Wood Hammer", "Earthquake", "Crunch", "Solar Beam"],
             },
             {
-                "species": "Snorlax",
+                "species": "Lucario",
                 "level": 82,
-                "moves": ["Body Slam", "Hyper Beam", "Pound"],
+                "moves": ["Aura Sphere", "Dragon Pulse", "Extreme Speed", "Mach Punch"],
             },
             {
-                "species": "Lapras",
+                "species": "Togekiss",
                 "level": 80,
-                "moves": ["Blizzard", "Body Slam", "Hydro Pump"],
+                "moves": ["Air Slash", "Aura Sphere", "Nasty Plot", "Thunder Wave"],
             },
         ],
-        "inventory": {"Hyper Potion": 5, "Full Heal": 5},
+        "inventory": {"Hyper Potion": 5, "Full Heal": 4},
     },
     trainer2_def={
-        "name": "Blue",
+        "name": "Palmer",
         "team": [
             {
-                "species": "Pidgeot",
+                "species": "Staraptor",
                 "level": 85,
-                "moves": ["Wing Attack", "Sky Attack", "Tackle"],
+                "moves": ["Brave Bird", "Quick Attack", "U-turn", "Take Down"],
             },
             {
-                "species": "Alakazam",
+                "species": "Magnezone",
                 "level": 82,
-                "moves": ["Psychic", "Tackle", "Pound"],
+                "moves": ["Thunderbolt", "Flash Cannon", "Tri Attack", "Thunder"],
             },
             {
-                "species": "Rhydon",
+                "species": "Rhyperior",
                 "level": 82,
-                "moves": ["Earthquake", "Rock Slide", "Pound"],
+                "moves": ["Earthquake", "Rock Slide", "Stone Edge", "Megahorn"],
             },
             {
-                "species": "Gyarados",
+                "species": "Weavile",
                 "level": 84,
-                "moves": ["Hydro Pump", "Hyper Beam", "Dragon Rage"],
+                "moves": ["Ice Shard", "Slash", "Bite", "Low Kick"],
             },
             {
-                "species": "Arcanine",
+                "species": "Luxray",
                 "level": 84,
-                "moves": ["Flamethrower", "Extreme Speed", "Bite"],
+                "moves": ["Wild Charge", "Bite", "Thunderbolt", "Body Slam"],
             },
             {
-                "species": "Exeggutor",
+                "species": "Dialga",
                 "level": 86,
-                "moves": ["Psychic", "Solar Beam", "Sleep Powder"],
+                "moves": ["Draco Meteor", "Flash Cannon", "Fire Blast", "Rock Slide"],
             },
         ],
-        "inventory": {"Hyper Potion": 5, "Full Heal": 5},
+        "inventory": {"Hyper Potion": 5, "Full Heal": 4},
     },
 )
 
-# Mirror Match: A perfectly symmetrical battle for agent evaluation.
+# Box-legend flavored battle with high-power special pressure.
 BattleRegistry.register(
-    "mirror_match",
+    "creation_trio_showdown",
+    trainer1_def={
+        "name": "Spear Pillar",
+        "team": [
+            {
+                "species": "Dialga",
+                "level": 72,
+                "moves": ["Draco Meteor", "Flash Cannon", "Fire Blast", "Thunder"],
+            },
+            {
+                "species": "Palkia",
+                "level": 72,
+                "moves": ["Spacial Rend", "Hydro Pump", "Fire Blast", "Thunder"],
+            },
+            {
+                "species": "Giratina",
+                "level": 72,
+                "moves": ["Shadow Claw", "Draco Meteor", "Aura Sphere", "Will-O-Wisp"],
+            },
+        ],
+        "inventory": {"Hyper Potion": 2, "Full Heal": 2},
+    },
+    trainer2_def={
+        "name": "Hall of Origin",
+        "team": [
+            {
+                "species": "Arceus",
+                "level": 72,
+                "moves": ["Judgment", "Extreme Speed", "Swords Dance", "Shadow Claw"],
+            },
+            {
+                "species": "Lucario",
+                "level": 70,
+                "moves": ["Aura Sphere", "Dragon Pulse", "Extreme Speed", "Mach Punch"],
+            },
+            {
+                "species": "Garchomp",
+                "level": 70,
+                "moves": ["Dragon Rush", "Earthquake", "Crunch", "Sand Attack"],
+            },
+        ],
+        "inventory": {"Hyper Potion": 2, "Full Heal": 2},
+    },
+)
+
+# Symmetric duel for deterministic agent-vs-agent comparison.
+BattleRegistry.register(
+    "lucario_mirror_duel",
     trainer1_def={
         "name": "Player 1",
         "team": [
             {
-                "species": "Pikachu",
+                "species": "Lucario",
                 "level": 50,
-                "moves": ["Thunderbolt", "Quick Attack", "Iron Tail", "Thunder Wave"],
+                "moves": [
+                    "Aura Sphere",
+                    "Extreme Speed",
+                    "Dragon Pulse",
+                    "Thunder Wave",
+                ],
             }
         ],
         "inventory": {"Super Potion": 1},
@@ -376,9 +401,14 @@ BattleRegistry.register(
         "name": "Player 2",
         "team": [
             {
-                "species": "Pikachu",
+                "species": "Lucario",
                 "level": 50,
-                "moves": ["Thunderbolt", "Quick Attack", "Iron Tail", "Thunder Wave"],
+                "moves": [
+                    "Aura Sphere",
+                    "Extreme Speed",
+                    "Dragon Pulse",
+                    "Thunder Wave",
+                ],
             }
         ],
         "inventory": {"Super Potion": 1},

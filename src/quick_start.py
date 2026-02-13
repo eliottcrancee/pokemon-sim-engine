@@ -1,5 +1,3 @@
-import os
-import sys
 
 from pokemon.agents import InputAgent, SmarterHeuristicAgent
 from pokemon.battle_registry import BattleRegistry
