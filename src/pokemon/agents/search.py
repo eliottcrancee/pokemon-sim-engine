@@ -1,12 +1,10 @@
 """This module defines agents that use search algorithms to make decisions."""
 
 import math
-import pickle
 import random
 import time
-from hashlib import blake2b
-from pathlib import Path
-from typing import Callable, Optional, cast
+from collections.abc import Callable
+from typing import cast
 
 import numpy as np
 from joblib import Parallel, delayed
@@ -17,116 +15,6 @@ from pokemon.battle import Battle
 from pokemon.loguru_logger import logger
 
 from .base_agent import BaseAgent
-
-StateSignature = tuple[int, int, int]
-SearchCacheKey = tuple[int, int, int, int]
-SharedRootCacheKey = tuple[int, int, int, int, int]
-
-_SHARED_MINIMAX_ROOT_CACHE: dict[SharedRootCacheKey, Action] = {}
-_SHARED_ALPHABETA_ROOT_CACHE: dict[SharedRootCacheKey, Action] = {}
-_SHARED_MINIMAX_CACHE_HITS = 0
-_SHARED_MINIMAX_CACHE_MISSES = 0
-_SHARED_ALPHABETA_CACHE_HITS = 0
-_SHARED_ALPHABETA_CACHE_MISSES = 0
-
-
-def _evaluation_func_cache_signature(
-    evaluation_func: Callable[[Battle, int], float],
-) -> int:
-    """Return a process-stable signature for evaluation function identity.
-
-    `id(callable)` is not stable across interpreter sessions, so use module +
-    qualname to make disk-persisted caches reusable after restart.
-    """
-
-    module = getattr(evaluation_func, "__module__", "")
-    qualname = getattr(evaluation_func, "__qualname__", "")
-    payload = f"{module}:{qualname}".encode("utf-8")
-    # Builtin hash() is salted per process, so use a deterministic digest.
-    digest = blake2b(payload, digest_size=8).digest()
-    return int.from_bytes(digest, byteorder="big", signed=False)
-
-
-def _save_shared_cache_payload(
-    file_path: str | Path,
-    cache: dict[SharedRootCacheKey, Action],
-    hits: int,
-    misses: int,
-) -> None:
-    path = Path(file_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "version": 2,
-        "cache": cache,
-        "hits": hits,
-        "misses": misses,
-    }
-    with path.open("wb") as f:
-        pickle.dump(payload, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-
-def _load_shared_cache_payload(
-    file_path: str | Path,
-) -> tuple[dict[SharedRootCacheKey, Action], int, int]:
-    path = Path(file_path)
-    if not path.exists():
-        return {}, 0, 0
-    with path.open("rb") as f:
-        payload = pickle.load(f)
-
-    if not isinstance(payload, dict):
-        return {}, 0, 0
-
-    if int(payload.get("version", 0)) != 2:
-        return {}, 0, 0
-
-    loaded_cache = payload.get("cache", {})
-    loaded_hits = int(payload.get("hits", 0))
-    loaded_misses = int(payload.get("misses", 0))
-
-    if not isinstance(loaded_cache, dict):
-        return {}, 0, 0
-
-    return loaded_cache, loaded_hits, loaded_misses
-
-
-def _battle_state_cache_key(battle: Battle) -> StateSignature:
-    """Build an immutable cache key for a mutable Battle state.
-
-    We avoid using Battle instances directly as dict keys because their hash can
-    change when the state mutates.
-    """
-
-    # Keep cache state purely structural around team state and terminal status.
-    # `round` and `max_rounds` are intentionally excluded to maximize reuse.
-    return (
-        hash(battle.trainers[0]),
-        hash(battle.trainers[1]),
-        ((battle.winner if battle.winner is not None else 2) << 1) | int(battle.tie),
-    )
-
-
-def _search_cache_key(battle: Battle, trainer_id: int, depth: int) -> SearchCacheKey:
-    state = _battle_state_cache_key(battle)
-    return (state[0], state[1], state[2], (depth << 1) | trainer_id)
-
-
-def _shared_root_cache_key(
-    battle: Battle,
-    trainer_id: int,
-    depth: int,
-    evaluation_func: Callable[[Battle, int], float],
-) -> SharedRootCacheKey:
-    search_key = _search_cache_key(battle, trainer_id, depth)
-    # Evaluation function identity is part of the key to avoid mixing caches
-    # across agents that use different scoring functions.
-    return (
-        search_key[0],
-        search_key[1],
-        search_key[2],
-        search_key[3],
-        _evaluation_func_cache_signature(evaluation_func),
-    )
 
 
 class OneStepUniformExpectimaxAgent(BaseAgent):
@@ -140,7 +28,7 @@ class OneStepUniformExpectimaxAgent(BaseAgent):
         self,
         name: str = "OneStepUniformExpectimax",
         parallelize: bool = False,
-        evaluation_func: Optional[Callable[[Battle, int], float]] = None,
+        evaluation_func: Callable[[Battle, int], float] | None = None,
     ):
         """Initialize the agent.
         Args:
@@ -223,15 +111,14 @@ class OneStepUniformExpectimaxAgent(BaseAgent):
 class MinimaxAgent(BaseAgent):
     """Minimax agent for Pokemon battles."""
 
-    DEFAULT_SWEEP_PARAMS = {"depth": [1, 2, 3], "use_cache": [False, True]}
+    DEFAULT_SWEEP_PARAMS = {"depth": [1, 2, 3]}
 
     def __init__(
         self,
         name: str = "Minimax",
         depth: int = 1,
-        use_cache: bool = True,
         parallelize: bool = False,
-        evaluation_func: Optional[Callable[[Battle, int], float]] = None,
+        evaluation_func: Callable[[Battle, int], float] | None = None,
     ):
         """Initialize the agent.
         Args:
@@ -242,69 +129,8 @@ class MinimaxAgent(BaseAgent):
         name = f"{name}(d={depth})"
         super().__init__(name)
         self.depth = depth
-        self.use_cache = use_cache
         self.parallelize = parallelize
         self.evaluation_func = evaluation_func or standard_evaluation
-
-    @classmethod
-    def clear_shared_cache(cls) -> None:
-        global _SHARED_MINIMAX_CACHE_HITS, _SHARED_MINIMAX_CACHE_MISSES
-        _SHARED_MINIMAX_ROOT_CACHE.clear()
-        _SHARED_MINIMAX_CACHE_HITS = 0
-        _SHARED_MINIMAX_CACHE_MISSES = 0
-
-    @classmethod
-    def get_shared_cache_stats(cls) -> dict[str, int]:
-        return {
-            "hits": _SHARED_MINIMAX_CACHE_HITS,
-            "misses": _SHARED_MINIMAX_CACHE_MISSES,
-            "size": len(_SHARED_MINIMAX_ROOT_CACHE),
-        }
-
-    @classmethod
-    def export_shared_cache(cls) -> dict[SharedRootCacheKey, Action]:
-        # Return a shallow copy so callers can merge/process without mutating
-        # the live shared cache by accident.
-        return dict(_SHARED_MINIMAX_ROOT_CACHE)
-
-    @classmethod
-    def merge_shared_cache(
-        cls,
-        cache_entries: dict[SharedRootCacheKey, Action],
-        *,
-        hits: int = 0,
-        misses: int = 0,
-        overwrite: bool = False,
-    ) -> int:
-        global _SHARED_MINIMAX_CACHE_HITS, _SHARED_MINIMAX_CACHE_MISSES
-        inserted = 0
-        for key, action in cache_entries.items():
-            if overwrite or key not in _SHARED_MINIMAX_ROOT_CACHE:
-                if key not in _SHARED_MINIMAX_ROOT_CACHE:
-                    inserted += 1
-                _SHARED_MINIMAX_ROOT_CACHE[key] = action
-
-        _SHARED_MINIMAX_CACHE_HITS += max(0, int(hits))
-        _SHARED_MINIMAX_CACHE_MISSES += max(0, int(misses))
-        return inserted
-
-    @classmethod
-    def save_shared_cache(cls, file_path: str | Path) -> None:
-        _save_shared_cache_payload(
-            file_path,
-            _SHARED_MINIMAX_ROOT_CACHE,
-            _SHARED_MINIMAX_CACHE_HITS,
-            _SHARED_MINIMAX_CACHE_MISSES,
-        )
-
-    @classmethod
-    def load_shared_cache(cls, file_path: str | Path) -> None:
-        global _SHARED_MINIMAX_CACHE_HITS, _SHARED_MINIMAX_CACHE_MISSES
-        loaded_cache, loaded_hits, loaded_misses = _load_shared_cache_payload(file_path)
-        _SHARED_MINIMAX_ROOT_CACHE.clear()
-        _SHARED_MINIMAX_ROOT_CACHE.update(loaded_cache)
-        _SHARED_MINIMAX_CACHE_HITS = loaded_hits
-        _SHARED_MINIMAX_CACHE_MISSES = loaded_misses
 
     def _evaluate_minimax_action(
         self,
@@ -377,18 +203,6 @@ class MinimaxAgent(BaseAgent):
             # This should not happen in a normal game state
             raise ValueError("No possible actions for agent.")
 
-        cache_key: SharedRootCacheKey | None = None
-        if self.use_cache:
-            global _SHARED_MINIMAX_CACHE_HITS, _SHARED_MINIMAX_CACHE_MISSES
-            cache_key = _shared_root_cache_key(
-                battle, trainer_id, self.depth, self.evaluation_func
-            )
-            cached_action = _SHARED_MINIMAX_ROOT_CACHE.get(cache_key)
-            if cached_action is not None and cached_action in my_actions:
-                _SHARED_MINIMAX_CACHE_HITS += 1
-                return cached_action
-            _SHARED_MINIMAX_CACHE_MISSES += 1
-
         if verbose:
             logger.info(f"[{self.name}] getting action for Trainer {trainer_id}")
             logger.info(
@@ -407,10 +221,7 @@ class MinimaxAgent(BaseAgent):
                 ),
             )
             best_action_index = max(range(len(scores)), key=lambda idx: scores[idx])
-            best_action = my_actions[best_action_index]
-            if cache_key is not None:
-                _SHARED_MINIMAX_ROOT_CACHE[cache_key] = best_action
-            return best_action
+            return my_actions[best_action_index]
         else:
             best_score = -float("inf")
             best_action = my_actions[0]
@@ -424,8 +235,6 @@ class MinimaxAgent(BaseAgent):
                     best_score = min_score
                     best_action = a0
 
-            if cache_key is not None:
-                _SHARED_MINIMAX_ROOT_CACHE[cache_key] = best_action
             return best_action
 
     def __repr__(self) -> str:
@@ -435,15 +244,14 @@ class MinimaxAgent(BaseAgent):
 class AlphaBetaAgent(BaseAgent):
     """Minimax agent with Alpha-Beta pruning for Pokemon battles."""
 
-    DEFAULT_SWEEP_PARAMS = {"depth": [1, 2, 3], "use_cache": [False, True]}
+    DEFAULT_SWEEP_PARAMS = {"depth": [1, 2, 3]}
 
     def __init__(
         self,
         name: str = "AlphaBeta",
         depth: int = 2,
-        use_cache: bool = True,
         parallelize: bool = False,
-        evaluation_func: Optional[Callable[[Battle, int], float]] = None,
+        evaluation_func: Callable[[Battle, int], float] | None = None,
     ):
         """Initialize the agent.
         Args:
@@ -454,69 +262,8 @@ class AlphaBetaAgent(BaseAgent):
         name = f"{name}(d={depth})"
         super().__init__(name)
         self.depth = depth
-        self.use_cache = use_cache
         self.parallelize = parallelize
         self.evaluation_func = evaluation_func or standard_evaluation
-
-    @classmethod
-    def clear_shared_cache(cls) -> None:
-        global _SHARED_ALPHABETA_CACHE_HITS, _SHARED_ALPHABETA_CACHE_MISSES
-        _SHARED_ALPHABETA_ROOT_CACHE.clear()
-        _SHARED_ALPHABETA_CACHE_HITS = 0
-        _SHARED_ALPHABETA_CACHE_MISSES = 0
-
-    @classmethod
-    def get_shared_cache_stats(cls) -> dict[str, int]:
-        return {
-            "hits": _SHARED_ALPHABETA_CACHE_HITS,
-            "misses": _SHARED_ALPHABETA_CACHE_MISSES,
-            "size": len(_SHARED_ALPHABETA_ROOT_CACHE),
-        }
-
-    @classmethod
-    def export_shared_cache(cls) -> dict[SharedRootCacheKey, Action]:
-        # Return a shallow copy so callers can merge/process without mutating
-        # the live shared cache by accident.
-        return dict(_SHARED_ALPHABETA_ROOT_CACHE)
-
-    @classmethod
-    def merge_shared_cache(
-        cls,
-        cache_entries: dict[SharedRootCacheKey, Action],
-        *,
-        hits: int = 0,
-        misses: int = 0,
-        overwrite: bool = False,
-    ) -> int:
-        global _SHARED_ALPHABETA_CACHE_HITS, _SHARED_ALPHABETA_CACHE_MISSES
-        inserted = 0
-        for key, action in cache_entries.items():
-            if overwrite or key not in _SHARED_ALPHABETA_ROOT_CACHE:
-                if key not in _SHARED_ALPHABETA_ROOT_CACHE:
-                    inserted += 1
-                _SHARED_ALPHABETA_ROOT_CACHE[key] = action
-
-        _SHARED_ALPHABETA_CACHE_HITS += max(0, int(hits))
-        _SHARED_ALPHABETA_CACHE_MISSES += max(0, int(misses))
-        return inserted
-
-    @classmethod
-    def save_shared_cache(cls, file_path: str | Path) -> None:
-        _save_shared_cache_payload(
-            file_path,
-            _SHARED_ALPHABETA_ROOT_CACHE,
-            _SHARED_ALPHABETA_CACHE_HITS,
-            _SHARED_ALPHABETA_CACHE_MISSES,
-        )
-
-    @classmethod
-    def load_shared_cache(cls, file_path: str | Path) -> None:
-        global _SHARED_ALPHABETA_CACHE_HITS, _SHARED_ALPHABETA_CACHE_MISSES
-        loaded_cache, loaded_hits, loaded_misses = _load_shared_cache_payload(file_path)
-        _SHARED_ALPHABETA_ROOT_CACHE.clear()
-        _SHARED_ALPHABETA_ROOT_CACHE.update(loaded_cache)
-        _SHARED_ALPHABETA_CACHE_HITS = loaded_hits
-        _SHARED_ALPHABETA_CACHE_MISSES = loaded_misses
 
     def _evaluate_alphabeta_action(
         self,
@@ -594,18 +341,6 @@ class AlphaBetaAgent(BaseAgent):
         if not my_actions:
             raise ValueError("No possible actions for agent.")
 
-        cache_key: SharedRootCacheKey | None = None
-        if self.use_cache:
-            global _SHARED_ALPHABETA_CACHE_HITS, _SHARED_ALPHABETA_CACHE_MISSES
-            cache_key = _shared_root_cache_key(
-                battle, trainer_id, self.depth, self.evaluation_func
-            )
-            cached_action = _SHARED_ALPHABETA_ROOT_CACHE.get(cache_key)
-            if cached_action is not None and cached_action in my_actions:
-                _SHARED_ALPHABETA_CACHE_HITS += 1
-                return cached_action
-            _SHARED_ALPHABETA_CACHE_MISSES += 1
-
         if verbose:
             logger.info(f"[{self.name}] getting action for Trainer {trainer_id}")
             logger.info(
@@ -629,10 +364,7 @@ class AlphaBetaAgent(BaseAgent):
                 ),
             )
             best_action_index = max(range(len(scores)), key=lambda idx: scores[idx])
-            best_action = my_actions[best_action_index]
-            if cache_key is not None:
-                _SHARED_ALPHABETA_ROOT_CACHE[cache_key] = best_action
-            return best_action
+            return my_actions[best_action_index]
         else:
             best_score = -float("inf")
             best_action = my_actions[0]
@@ -653,8 +385,6 @@ class AlphaBetaAgent(BaseAgent):
 
                 alpha = max(alpha, best_score)
 
-            if cache_key is not None:
-                _SHARED_ALPHABETA_ROOT_CACHE[cache_key] = best_action
             return best_action
 
     def __repr__(self) -> str:
@@ -679,7 +409,7 @@ class MonteCarloExpectiminimaxAgent(BaseAgent):
         depth: int = 1,
         num_simulations: int = 20,
         parallelize: bool = False,
-        evaluation_func: Optional[Callable[[Battle, int], float]] = None,
+        evaluation_func: Callable[[Battle, int], float] | None = None,
     ):
         """
         Args:
@@ -747,8 +477,7 @@ class MonteCarloExpectiminimaxAgent(BaseAgent):
             )
 
             # The opponent wants to minimize our score
-            if expected_value < worst_case_expected_value:
-                worst_case_expected_value = expected_value
+            worst_case_expected_value = min(worst_case_expected_value, expected_value)
 
             if verbose:
                 logger.info(f"  vs Opponent {op_action}: EV = {expected_value:.2f}")
@@ -830,7 +559,7 @@ class RiskAwareExpectimaxAgent(BaseAgent):
         num_simulations: int = 10,
         risk_lambda: float = 0.1,
         parallelize: bool = False,
-        evaluation_func: Optional[Callable[[Battle, int], float]] = None,
+        evaluation_func: Callable[[Battle, int], float] | None = None,
     ):
         if depth < 1:
             raise ValueError("depth must be >= 1")
@@ -999,7 +728,7 @@ class IterativeDeepeningAlphaBetaAgent(BaseAgent):
         name: str = "IterativeAlphaBeta",
         max_depth: int = 4,
         time_limit: float = 2.0,
-        evaluation_func: Optional[Callable[[Battle, int], float]] = None,
+        evaluation_func: Callable[[Battle, int], float] | None = None,
     ):
         """
         Args:
@@ -1283,7 +1012,7 @@ class MCTSAgent(BaseAgent):
         name: str = "MCTS",
         time_limit: float = 1.0,
         rollout_depth: int = 8,
-        evaluation_func: Optional[Callable[[Battle, int], float]] = None,
+        evaluation_func: Callable[[Battle, int], float] | None = None,
     ):
         name = f"{name}(time={time_limit}s, rollout_d={rollout_depth})"
         super().__init__(name)

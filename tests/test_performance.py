@@ -35,14 +35,13 @@ def test_performance_battle_turns(benchmark):
     benchmark(run_turn)
 
 
-@pytest.mark.parametrize("use_cache", [False, True])
-def test_benchmark_minimax_cache(benchmark, use_cache: bool):
-    """Benchmarks Minimax action selection with and without transposition cache."""
+def test_benchmark_minimax(benchmark):
+    """Benchmarks Minimax action selection."""
     battle = BattleRegistry.get(BASELINE_BATTLE)
     if battle is None:
         raise AssertionError(f"BattleRegistry scenario '{BASELINE_BATTLE}' not found")
 
-    agent = MinimaxAgent(depth=2, use_cache=use_cache, parallelize=False)
+    agent = MinimaxAgent(depth=2, parallelize=False)
 
     def run_get_action() -> None:
         random.seed(12345)
@@ -51,14 +50,13 @@ def test_benchmark_minimax_cache(benchmark, use_cache: bool):
     benchmark(run_get_action)
 
 
-@pytest.mark.parametrize("use_cache", [False, True])
-def test_benchmark_alphabeta_cache(benchmark, use_cache: bool):
-    """Benchmarks Alpha-Beta action selection with and without transposition cache."""
+def test_benchmark_alphabeta(benchmark):
+    """Benchmarks Alpha-Beta action selection."""
     battle = BattleRegistry.get(BASELINE_BATTLE)
     if battle is None:
         raise AssertionError(f"BattleRegistry scenario '{BASELINE_BATTLE}' not found")
 
-    agent = AlphaBetaAgent(depth=2, use_cache=use_cache, parallelize=False)
+    agent = AlphaBetaAgent(depth=2, parallelize=False)
 
     def run_get_action() -> None:
         random.seed(12345)

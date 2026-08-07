@@ -249,9 +249,7 @@ def test_pure_status_move_accuracy_rolls(chimchar: Pokemon, piplup: Pokemon):
         _, bd, crit, stab, eff = sleep_powder.calculate_damage(
             chimchar, piplup, rng=rng
         )
-        sleep_powder.secondary_effect(
-            chimchar, piplup, 0, bd, crit, stab, eff, rng=rng
-        )
+        sleep_powder.secondary_effect(chimchar, piplup, 0, bd, crit, stab, eff, rng=rng)
         if piplup.status == PokemonStatus.SLEEP:
             sleeps += 1
 
@@ -274,9 +272,7 @@ def test_status_move_accuracy_scaled_by_user_stage(chimchar: Pokemon, piplup: Po
         _, bd, crit, stab, eff = sleep_powder.calculate_damage(
             chimchar, piplup, rng=rng
         )
-        sleep_powder.secondary_effect(
-            chimchar, piplup, 0, bd, crit, stab, eff, rng=rng
-        )
+        sleep_powder.secondary_effect(chimchar, piplup, 0, bd, crit, stab, eff, rng=rng)
         if piplup.status == PokemonStatus.SLEEP:
             sleeps += 1
 
@@ -333,17 +329,13 @@ def test_stat_move_debuff_misses_with_low_accuracy(chimchar: Pokemon, piplup: Po
 
     # Patch random to force a miss (0.9 > 0.70).
     with patch("random.random", return_value=0.9):
-        msgs = low_acc_stat.secondary_effect(
-            chimchar, piplup, 0, 0, False, False, 1.0
-        )
+        msgs = low_acc_stat.secondary_effect(chimchar, piplup, 0, 0, False, False, 1.0)
     assert "missed" in msgs[0].text
     assert piplup.modifiers[4] == 0  # No stat change applied
 
     # And a hit applies it.
     with patch("random.random", return_value=0.1):
-        msgs = low_acc_stat.secondary_effect(
-            chimchar, piplup, 0, 0, False, False, 1.0
-        )
+        msgs = low_acc_stat.secondary_effect(chimchar, piplup, 0, 0, False, False, 1.0)
     assert "missed" not in msgs[0].text
     assert piplup.modifiers[4] == -1
 

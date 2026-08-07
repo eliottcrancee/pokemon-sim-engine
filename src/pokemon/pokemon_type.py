@@ -237,10 +237,10 @@ _EFFECTIVENESS_CHART_3D: Final[tuple[tuple[tuple[float, ...], ...], ...]] = (
 
 
 if __name__ == "__main__":
-    import matplotlib.colors as colors
     import matplotlib.pyplot as plt
     import numpy as np
     import seaborn as sns
+    from matplotlib import colors
     from matplotlib.patches import Rectangle
 
     # 1. Prepare Data

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass
-from typing import Final, Optional
+from typing import Final
 
 from pokemon.message import Message
 from pokemon.move import Move, MoveRegistry
@@ -86,27 +86,27 @@ class Pokemon:
     """
 
     __slots__ = (
-        "species",
-        "surname",
-        "level",
-        "_ivs",
-        "_evs",
-        "move_slots",
-        "_current_hp",
-        "_max_hp",
-        "_status",
-        "_stat_stages",
-        "_raw_stats",
-        "_effective_stats",
-        "_level_factor",
-        "is_alive",
-        "_confused",
-        "_confused_turns",
-        "_taunted",
-        "_taunted_turns",
         "_accuracy",
         "_accuracy_stage",
+        "_confused",
+        "_confused_turns",
+        "_current_hp",
+        "_effective_stats",
+        "_evs",
+        "_ivs",
+        "_level_factor",
+        "_max_hp",
+        "_raw_stats",
         "_sleep_turns",
+        "_stat_stages",
+        "_status",
+        "_taunted",
+        "_taunted_turns",
+        "is_alive",
+        "level",
+        "move_slots",
+        "species",
+        "surname",
     )
 
     def __init__(
@@ -233,7 +233,7 @@ class Pokemon:
     @hp.setter
     def hp(self, value: int):
         # Branchless clamping
-        self._current_hp = value if value < self._max_hp else self._max_hp
+        self._current_hp = min(self._max_hp, value)
         if self._current_hp <= 0:
             self._current_hp = 0
             self.is_alive = False
@@ -572,7 +572,7 @@ class SpeciesRegistry:
         return species
 
     @classmethod
-    def get(cls, name_or_id: str | int) -> Optional[PokemonSpecies]:
+    def get(cls, name_or_id: str | int) -> PokemonSpecies | None:
         if isinstance(name_or_id, int):
             if 0 <= name_or_id < len(cls._species):
                 return cls._species[name_or_id]

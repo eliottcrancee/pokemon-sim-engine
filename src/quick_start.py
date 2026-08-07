@@ -1,4 +1,3 @@
-
 from pokemon.agents import InputAgent, SmarterHeuristicAgent
 from pokemon.battle_registry import BattleRegistry
 from pokemon.ui import play_ui
@@ -10,9 +9,11 @@ def main():
     # Load a battle from the registry
     battle_name = "sinnoh_opening_sparks"
     battle = BattleRegistry.get(battle_name)
-    
+
     if not battle:
-        print(f"Error: Battle '{battle_name}' not found in registry. Exiting quick start.")
+        print(
+            f"Error: Battle '{battle_name}' not found in registry. Exiting quick start."
+        )
         return
 
     # Create Agents (You against a Smarter Heuristic AI)
@@ -21,7 +22,7 @@ def main():
 
     print(f"\nStarting a quick UI battle: You vs. {ai_agent.name} in '{battle_name}'!")
     print("Loading...")
-    
+
     play_ui(battle, player_agent, ai_agent)
 
     print("\n--- Quick Start Complete ---")

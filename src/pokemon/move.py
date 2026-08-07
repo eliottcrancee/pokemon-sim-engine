@@ -73,8 +73,6 @@ class MoveCategory(IntEnum):
 class MoveError(Exception):
     """Custom exception for move-related errors."""
 
-    pass
-
 
 def _calculate_base_damage(
     power: int,
@@ -124,16 +122,16 @@ class Move(ABC):
     """
 
     __slots__ = (
-        "id",
-        "name",
-        "category",
-        "type",
-        "power",
         "accuracy",
-        "pp",
-        "max_pp",
-        "priority",
         "always_hits",
+        "category",
+        "id",
+        "max_pp",
+        "name",
+        "power",
+        "pp",
+        "priority",
+        "type",
     )
 
     def __init__(
@@ -242,11 +240,11 @@ class StatMove(Move):
     """Move that modifies a Pokémon's stats (Buff/Debuff)."""
 
     __slots__ = (
-        "stat_index",
-        "is_accuracy_modifier",
-        "stages",
-        "self_target",
         "_stat_name",
+        "is_accuracy_modifier",
+        "self_target",
+        "stages",
+        "stat_index",
     )
 
     def __init__(
@@ -348,12 +346,12 @@ class ApplyStatusMove(Move):
     """
 
     __slots__ = (
+        "accuracy_stages",
+        "duration",
+        "effect_chance",
+        "self_target",
         "status_to_apply",
         "volatile_status",
-        "effect_chance",
-        "duration",
-        "self_target",
-        "accuracy_stages",
     )
 
     def __init__(
@@ -441,9 +439,7 @@ class ApplyStatusMove(Move):
         elif self.volatile_status == "accuracy" and self.accuracy_stages:
             affected.apply_accuracy_modifier(self.accuracy_stages)
             adv = "rose" if self.accuracy_stages > 0 else "fell"
-            msgs.append(
-                Message(f"{affected.surname}'s accuracy {adv}!")
-            )
+            msgs.append(Message(f"{affected.surname}'s accuracy {adv}!"))
 
         return msgs
 
@@ -1028,5 +1024,3 @@ class Moves(metaclass=_MoveAccessorMeta):
     Provides a clean, dot-notation accessor for all registered moves.
     Usage: Moves.Tackle, Moves.Ember.
     """
-
-    pass

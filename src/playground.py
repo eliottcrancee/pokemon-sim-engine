@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-import os
 import statistics
 import time
 from dataclasses import dataclass
 from itertools import product
-from pathlib import Path
 from typing import Any, Callable
 
 from tqdm import tqdm
@@ -15,7 +13,6 @@ from pokemon.agents import (
     BaseAgent,
     BestAttackAgent,
     BestAttackAndPotionAgent,
-    CachePrecomputeReport,
     InputAgent,
     IterativeDeepeningAlphaBetaAgent,
     MCTSAgent,
@@ -27,7 +24,6 @@ from pokemon.agents import (
     RandomAttackAndPotionAgent,
     RiskAwareExpectimaxAgent,
     SmarterHeuristicAgent,
-    precompute_shared_action_cache,
 )
 from pokemon.battle import Battle
 from pokemon.battle_registry import BattleRegistry
@@ -69,24 +65,14 @@ AGENT_CATALOG: list[AgentEntry] = [
         lambda: OneStepUniformExpectimaxAgent(),
     ),
     AgentEntry(
-        "minimax_d2_cache",
-        "Minimax d=2 (root cache)",
-        lambda: MinimaxAgent(depth=2, use_cache=True),
+        "minimax_d2",
+        "Minimax d=2",
+        lambda: MinimaxAgent(depth=2),
     ),
     AgentEntry(
-        "minimax_d2_nocache",
-        "Minimax d=2 (no cache)",
-        lambda: MinimaxAgent(depth=2, use_cache=False),
-    ),
-    AgentEntry(
-        "alphabeta_d2_cache",
-        "Alpha-Beta d=2 (root cache)",
-        lambda: AlphaBetaAgent(depth=2, use_cache=True),
-    ),
-    AgentEntry(
-        "alphabeta_d2_nocache",
-        "Alpha-Beta d=2 (no cache)",
-        lambda: AlphaBetaAgent(depth=2, use_cache=False),
+        "alphabeta_d2",
+        "Alpha-Beta d=2",
+        lambda: AlphaBetaAgent(depth=2),
     ),
     AgentEntry(
         "risk_expectimax",
@@ -127,20 +113,6 @@ SWEEP_FAMILIES: list[type[BaseAgent]] = [
     BestAttackAndPotionAgent,
     RandomAttackAndPotionAgent,
 ]
-
-_CACHE_DIR = Path(".cache")
-_MINIMAX_CACHE_FILE = _CACHE_DIR / "minimax_root_cache.pkl"
-_ALPHABETA_CACHE_FILE = _CACHE_DIR / "alphabeta_root_cache.pkl"
-
-
-def _load_persistent_search_caches() -> None:
-    MinimaxAgent.load_shared_cache(_MINIMAX_CACHE_FILE)
-    AlphaBetaAgent.load_shared_cache(_ALPHABETA_CACHE_FILE)
-
-
-def _save_persistent_search_caches() -> None:
-    MinimaxAgent.save_shared_cache(_MINIMAX_CACHE_FILE)
-    AlphaBetaAgent.save_shared_cache(_ALPHABETA_CACHE_FILE)
 
 
 def _family_display_name(agent_cls: type[BaseAgent]) -> str:
@@ -195,21 +167,6 @@ def _prompt_optional_int(prompt: str) -> int | None:
             return int(raw)
         except ValueError:
             print("Please enter a valid integer or empty.")
-
-
-def _prompt_optional_positive_int(prompt: str) -> int | None:
-    while True:
-        raw = _safe_input(f"{prompt} [empty=disabled]: ")
-        if not raw:
-            return None
-        try:
-            value = int(raw)
-            if value < 1:
-                print("Value must be >= 1.")
-                continue
-            return value
-        except ValueError:
-            print("Please enter a valid positive integer or empty.")
 
 
 def _prompt_yes_no(prompt: str, default: bool = True) -> bool:
@@ -287,39 +244,6 @@ def _select_agent(prompt: str) -> AgentEntry:
     labels = [entry.label for entry in AGENT_CATALOG]
     selected_index = _select_from_list(prompt, labels)
     return AGENT_CATALOG[selected_index]
-
-
-def _is_cache_precomputable(agent: BaseAgent) -> bool:
-    if not bool(getattr(agent, "use_cache", False)):
-        return False
-    agent_cls = agent.__class__
-    return all(
-        callable(getattr(agent_cls, method_name, None))
-        for method_name in (
-            "clear_shared_cache",
-            "get_shared_cache_stats",
-            "export_shared_cache",
-            "merge_shared_cache",
-        )
-    )
-
-
-def _select_precomputable_agent(prompt: str) -> AgentEntry:
-    precomputable_entries: list[AgentEntry] = []
-    for entry in AGENT_CATALOG:
-        try:
-            candidate = entry.factory()
-        except Exception:
-            continue
-        if _is_cache_precomputable(candidate):
-            precomputable_entries.append(entry)
-
-    if not precomputable_entries:
-        raise RuntimeError("No precomputable cache agents found in catalog.")
-
-    labels = [entry.label for entry in precomputable_entries]
-    selected_index = _select_from_list(prompt, labels)
-    return precomputable_entries[selected_index]
 
 
 def _parse_csv_values(raw: str, kind: str, default_values: list[Any]) -> list[Any]:
@@ -535,11 +459,6 @@ def run_agent_benchmark() -> None:
     agent = entry.factory()
     opponent = opponent_entry.factory()
 
-    cache_stats_getter = getattr(agent.__class__, "get_shared_cache_stats", None)
-    cache_clearer = getattr(agent.__class__, "clear_shared_cache", None)
-    if callable(cache_clearer):
-        cache_clearer()
-
     battle_durations: list[float] = []
     rounds_per_battle: list[int] = []
     agent_call_durations: list[float] = []
@@ -559,16 +478,6 @@ def run_agent_benchmark() -> None:
             battle_instance.turn(action_0, action_1)
         battle_durations.append(time.perf_counter() - battle_start)
         rounds_per_battle.append(battle_instance.round)
-
-        if callable(cache_stats_getter) and ((index + 1) % 25 == 0):
-            stats = cache_stats_getter()
-            progress.set_postfix(
-                {
-                    "hits": stats["hits"],
-                    "misses": stats["misses"],
-                    "size": stats["size"],
-                }
-            )
 
     min_battle_time = min(battle_durations)
     max_battle_time = max(battle_durations)
@@ -612,101 +521,14 @@ def run_agent_benchmark() -> None:
     print(f"- Mean: {mean_agent_call:.6f}s")
     print(f"- Std Dev: {std_agent_call:.6f}s")
 
-    if callable(cache_stats_getter):
-        stats = cache_stats_getter()
-        print("\nShared cache stats")
-        print(f"- Hits: {stats['hits']}")
-        print(f"- Misses: {stats['misses']}")
-        print(f"- Size: {stats['size']}")
-
-
-def run_cache_precompute() -> None:
-    print("\n=== Parallel Cache Precompute ===")
-    cache_entry = _select_precomputable_agent("Choose the cache-enabled agent:")
-    opponent_entry = _select_agent("Choose the opponent agent for rollout battles:")
-    battle_name, battle_template = _select_battle(prompt_seed=False)
-
-    total_battles = _prompt_int("Total battles to precompute", minimum=1, default=500)
-    cpu_total = max(1, os.cpu_count() or 1)
-    worker_count = _prompt_int("Parallel workers", minimum=1, default=cpu_total)
-    merge_every = _prompt_optional_positive_int("Incremental merge every X battles")
-    clear_before_merge = _prompt_yes_no(
-        "Clear existing shared cache before merge?", default=True
-    )
-
-    if worker_count < cpu_total:
-        print(
-            f"Info: using {worker_count}/{cpu_total} logical CPUs "
-            "(set a higher value to increase utilization)."
-        )
-
-    cache_agent = cache_entry.factory()
-    cache_cls = cache_agent.__class__
-    get_shared_cache_stats = getattr(cache_cls, "get_shared_cache_stats", None)
-    if not callable(get_shared_cache_stats):
-        raise RuntimeError("Selected agent class does not support cache APIs.")
-
-    same_agent_selfplay = cache_entry.key == opponent_entry.key
-
-    print(
-        "Launching precompute with "
-        f"{worker_count} workers on '{battle_name}' "
-        f"({total_battles} battles total)."
-    )
-    if same_agent_selfplay:
-        print("Self-play detected: precompute will warm cache for trainer 0 and 1.")
-    if merge_every is not None:
-        print(f"Incremental merge enabled every {merge_every} battles.")
-        if merge_every < worker_count:
-            print(
-                "Warning: merge batch size is smaller than worker count; "
-                "some workers will stay idle. Increase merge_every for better CPU usage."
-            )
-
-    def _on_batch_progress(
-        batch_index: int, batch_total: int, completed: int, cache_size: int
-    ) -> None:
-        print(
-            f"Batch {batch_index}/{batch_total} merged "
-            f"({completed}/{total_battles} battles, cache size={cache_size})."
-        )
-
-    report: CachePrecomputeReport = precompute_shared_action_cache(
-        battle_template=battle_template,
-        cache_agent_factory=cache_entry.factory,
-        opponent_factory=opponent_entry.factory,
-        total_battles=total_battles,
-        workers=worker_count,
-        merge_every=merge_every,
-        clear_before_merge=clear_before_merge,
-        warm_both_sides=same_agent_selfplay,
-        progress_callback=_on_batch_progress,
-    )
-
-    print("\nPrecompute summary")
-    print(f"- Cache agent: {cache_entry.label}")
-    print(f"- Opponent: {opponent_entry.label}")
-    print(f"- Battle: {battle_name}")
-    print(f"- Total battles simulated: {report.total_battles}")
-    print(f"- Total rounds simulated: {report.total_rounds}")
-    print(f"- Workers used: {report.workers_used}")
-    print(f"- Batches: {report.batches}")
-    print(f"- Elapsed: {report.elapsed_seconds:.3f}s")
-    print(f"- Worker-level hits: {report.worker_hits}")
-    print(f"- Worker-level misses: {report.worker_misses}")
-    print(f"- New cache entries merged: {report.merged_entries}")
-    print(f"- Shared cache size after merge: {report.final_cache_size}")
-
 
 def main() -> None:
-    _load_persistent_search_caches()
     menu_actions = [
         MenuAction("ui", "UI duel (human vs AI)", run_ui_duel),
         MenuAction("sim", "Agent vs Agent simulation", run_agent_vs_agent),
         MenuAction("tour", "Tournament (Glicko-2)", run_tournament),
         MenuAction("sweep", "Hyperparameter sweep", run_hyperparameter_sweep),
         MenuAction("bench", "Agent action benchmark", run_agent_benchmark),
-        MenuAction("precompute", "Parallel cache precompute", run_cache_precompute),
         MenuAction("quit", "Exit", lambda: None),
     ]
 
@@ -716,13 +538,11 @@ def main() -> None:
         selected_action = menu_actions[selected_index]
 
         if selected_action.key == "quit":
-            _save_persistent_search_caches()
             print("Exiting playground.")
             return
 
         try:
             selected_action.handler()
-            _save_persistent_search_caches()
         except Exception as error:
             print(f"\nError: {error}")
 

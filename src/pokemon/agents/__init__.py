@@ -1,5 +1,4 @@
 from .base_agent import BaseAgent
-from .cache_precompute import CachePrecomputeReport, precompute_shared_action_cache
 from .heuristic import (
     BestAttackAgent,
     BestAttackAndPotionAgent,
@@ -18,22 +17,20 @@ from .search import (
 from .simple import FirstAgent, InputAgent, RandomAgent, RandomAttackAgent
 
 __all__ = [
+    "AlphaBetaAgent",
     "BaseAgent",
-    "CachePrecomputeReport",
-    "precompute_shared_action_cache",
     "BestAttackAgent",
     "BestAttackAndPotionAgent",
-    "RandomAttackAndPotionAgent",
-    "SmarterHeuristicAgent",
-    "AlphaBetaAgent",
+    "FirstAgent",
+    "InputAgent",
+    "IterativeDeepeningAlphaBetaAgent",
+    "MCTSAgent",
     "MinimaxAgent",
     "MonteCarloExpectiminimaxAgent",
     "OneStepUniformExpectimaxAgent",
-    "RiskAwareExpectimaxAgent",
-    "FirstAgent",
-    "InputAgent",
     "RandomAgent",
     "RandomAttackAgent",
-    "IterativeDeepeningAlphaBetaAgent",
-    "MCTSAgent",
+    "RandomAttackAndPotionAgent",
+    "RiskAwareExpectimaxAgent",
+    "SmarterHeuristicAgent",
 ]
