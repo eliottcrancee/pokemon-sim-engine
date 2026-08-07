@@ -4,7 +4,7 @@ import math
 import random
 import time
 from collections.abc import Callable
-from typing import cast
+from typing import ClassVar, cast
 
 import numpy as np
 from joblib import Parallel, delayed
@@ -82,6 +82,9 @@ class OneStepUniformExpectimaxAgent(BaseAgent):
         my_actions = battle.get_possible_actions(trainer_id)
         op_actions = battle.get_possible_actions(1 - trainer_id)
 
+        if not my_actions:
+            raise ValueError("No possible actions for agent.")
+
         if verbose:
             logger.info(f"[{self.name}] getting action for Trainer {trainer_id}")
             logger.info(
@@ -104,14 +107,14 @@ class OneStepUniformExpectimaxAgent(BaseAgent):
                     battle, trainer_id, a0, op_actions, verbose
                 )
 
-        best_index = np.argmax(avg_scores)
+        best_index = int(np.argmax(avg_scores))
         return my_actions[best_index]
 
 
 class MinimaxAgent(BaseAgent):
     """Minimax agent for Pokemon battles."""
 
-    DEFAULT_SWEEP_PARAMS = {"depth": [1, 2, 3]}
+    DEFAULT_SWEEP_PARAMS: ClassVar[dict[str, list[int]]] = {"depth": [1, 2, 3]}
 
     def __init__(
         self,
@@ -244,7 +247,7 @@ class MinimaxAgent(BaseAgent):
 class AlphaBetaAgent(BaseAgent):
     """Minimax agent with Alpha-Beta pruning for Pokemon battles."""
 
-    DEFAULT_SWEEP_PARAMS = {"depth": [1, 2, 3]}
+    DEFAULT_SWEEP_PARAMS: ClassVar[dict[str, list[int]]] = {"depth": [1, 2, 3]}
 
     def __init__(
         self,
@@ -398,7 +401,7 @@ class MonteCarloExpectiminimaxAgent(BaseAgent):
     Expected Value (EV) for every action pair.
     """
 
-    DEFAULT_SWEEP_PARAMS = {
+    DEFAULT_SWEEP_PARAMS: ClassVar[dict[str, list[int]]] = {
         "depth": [1, 2],
         "num_simulations": [20, 40, 60],
     }
@@ -420,6 +423,11 @@ class MonteCarloExpectiminimaxAgent(BaseAgent):
             parallelize: Whether to use multiple CPU cores.
             evaluation_func: Custom evaluation function.
         """
+        if depth < 1:
+            raise ValueError("depth must be >= 1")
+        if num_simulations < 1:
+            raise ValueError("num_simulations must be >= 1")
+
         name = f"{name}(d={depth}, sim={num_simulations})"
         super().__init__(name)
         self.depth = depth
@@ -428,30 +436,66 @@ class MonteCarloExpectiminimaxAgent(BaseAgent):
         self.evaluation_func = evaluation_func or standard_evaluation
 
     def _simulate_outcome(
-        self, battle: Battle, trainer_id: int, my_action: Action, op_action: Action
+        self,
+        battle: Battle,
+        trainer_id: int,
+        my_action: Action,
+        op_action: Action,
+        depth: int,
     ) -> float:
         """
-        Runs N simulations for a specific pair of actions and returns the average score.
-        This smooths out RNG (misses, crits, speed ties).
+        Runs N simulations for a specific pair of actions and returns the
+        average score. This smooths out RNG (misses, crits, speed ties).
+
+        ``Battle.copy()`` clones the RNG state, so every simulation must be
+        re-seeded with an independent stream: otherwise all N samples resolve
+        identically and the average collapses to a single deterministic turn.
         """
         total_score = 0.0
 
-        # We run the EXACT same turn logic N times to see the distribution of outcomes
         for _ in range(self.num_simulations):
             sim_battle = battle.copy()
+            # Independent RNG per sample so the outcome distribution is
+            # actually explored instead of repeating one deterministic roll.
+            sim_battle.reseed(random.getrandbits(64))
 
-            # Apply moves based on ID
             if trainer_id == 0:
                 sim_battle.turn(my_action, op_action)
             else:
                 sim_battle.turn(op_action, my_action)
 
-            # If we are at depth 0, evaluate. If depth > 1, we would recurse here.
-            # For performance, Monte Carlo is usually done at depth 1 or with MCTS.
-            # Here we stick to depth 1 evaluation for the sampling.
-            total_score += self.evaluation_func(sim_battle, trainer_id)
+            if depth <= 1 or sim_battle.winner is not None:
+                total_score += self.evaluation_func(sim_battle, trainer_id)
+            else:
+                total_score += self._expectimax_value(
+                    sim_battle, trainer_id, depth - 1
+                )
 
         return total_score / self.num_simulations
+
+    def _expectimax_value(self, battle: Battle, trainer_id: int, depth: int) -> float:
+        """Recursive expectimax evaluation for depth > 1."""
+        if depth == 0 or battle.winner is not None:
+            return self.evaluation_func(battle, trainer_id)
+
+        my_actions = battle.get_possible_actions(trainer_id)
+        op_actions = battle.get_possible_actions(1 - trainer_id)
+
+        if not my_actions:
+            return self.evaluation_func(battle, trainer_id)
+
+        action_scores = [
+            self._evaluate_action_node(
+                battle,
+                trainer_id,
+                my_action,
+                op_actions,
+                depth,
+                False,
+            )
+            for my_action in my_actions
+        ]
+        return max(action_scores)
 
     def _evaluate_action_node(
         self,
@@ -459,6 +503,7 @@ class MonteCarloExpectiminimaxAgent(BaseAgent):
         trainer_id: int,
         my_action: Action,
         op_actions: list[Action],
+        depth: int,
         verbose: bool,
     ) -> float:
         """
@@ -473,7 +518,7 @@ class MonteCarloExpectiminimaxAgent(BaseAgent):
         for op_action in op_actions:
             # Calculate Expected Value of this specific matchup (My Move vs Op Move)
             expected_value = self._simulate_outcome(
-                battle, trainer_id, my_action, op_action
+                battle, trainer_id, my_action, op_action, depth
             )
 
             # The opponent wants to minimize our score
@@ -505,7 +550,7 @@ class MonteCarloExpectiminimaxAgent(BaseAgent):
                 list[float],
                 Parallel(n_jobs=-1)(
                     delayed(self._evaluate_action_node)(
-                        battle, trainer_id, a0, op_actions, verbose
+                        battle, trainer_id, a0, op_actions, self.depth, verbose
                     )
                     for a0 in my_actions
                 ),
@@ -524,7 +569,7 @@ class MonteCarloExpectiminimaxAgent(BaseAgent):
 
                 # Get the Minimax value for this action (assuming average RNG)
                 score = self._evaluate_action_node(
-                    battle, trainer_id, my_action, op_actions, verbose
+                    battle, trainer_id, my_action, op_actions, self.depth, verbose
                 )
 
                 if verbose:
@@ -546,7 +591,7 @@ class RiskAwareExpectimaxAgent(BaseAgent):
         utility = mean(score_samples) - risk_lambda * std(score_samples)
     """
 
-    DEFAULT_SWEEP_PARAMS = {
+    DEFAULT_SWEEP_PARAMS: ClassVar[dict[str, list[int] | list[float]]] = {
         "depth": [1, 2],
         "num_simulations": [20, 40, 60],
         "risk_lambda": [0.05, 0.1, 0.15, 0.2],
@@ -588,6 +633,10 @@ class RiskAwareExpectimaxAgent(BaseAgent):
 
         for _ in range(self.num_simulations):
             sim_battle = battle.copy()
+            # Battle.copy() clones the RNG state; without re-seeding every
+            # sample resolves identically and std_dev is always 0, which
+            # silently disables the risk penalty.
+            sim_battle.reseed(random.getrandbits(64))
 
             if trainer_id == 0:
                 sim_battle.turn(my_action, op_action)
@@ -718,7 +767,7 @@ class IterativeDeepeningAlphaBetaAgent(BaseAgent):
     3. Time Management: Can stop searching if a time limit is reached.
     """
 
-    DEFAULT_SWEEP_PARAMS = {
+    DEFAULT_SWEEP_PARAMS: ClassVar[dict[str, list[int] | list[float]]] = {
         "max_depth": [2, 3, 4],
         "time_limit": [0.5, 1.0, 2.0],
     }
@@ -887,10 +936,14 @@ class IterativeDeepeningAlphaBetaAgent(BaseAgent):
         self.start_time = time.perf_counter()
         my_actions = battle.get_possible_actions(trainer_id)
 
+        if not my_actions:
+            raise ValueError("No possible actions for agent.")
+
         # Initial Sort
         my_actions = self._heuristic_sort(battle, my_actions, trainer_id)
 
         best_action = my_actions[0]
+        completed_depth = 0
 
         try:
             # Iterative Deepening Loop
@@ -918,6 +971,7 @@ class IterativeDeepeningAlphaBetaAgent(BaseAgent):
                 # If we finished the depth successfully, update the main best_action
                 if current_depth_best_action is not None:
                     best_action = current_depth_best_action
+                    completed_depth = d
 
                     # Update sorting for next depth: Put the best action first!
                     # This massively improves pruning for the next depth
@@ -937,7 +991,8 @@ class IterativeDeepeningAlphaBetaAgent(BaseAgent):
         except TimeoutError:
             if verbose:
                 logger.info(
-                    f"[{self.name}] Time limit reached. Returning result from depth {d - 1}."
+                    f"[{self.name}] Time limit reached. "
+                    f"Returning result from depth {completed_depth}."
                 )
 
         return best_action
@@ -1002,7 +1057,7 @@ class MCTSAgent(BaseAgent):
     (misses, crits, speed ties) naturally by averaging results over many visits.
     """
 
-    DEFAULT_SWEEP_PARAMS = {
+    DEFAULT_SWEEP_PARAMS: ClassVar[dict[str, list[int] | list[float]]] = {
         "time_limit": [0.5, 1.0, 2.0],
         "rollout_depth": [4, 8, 12],
     }

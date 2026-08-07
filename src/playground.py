@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import statistics
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from itertools import product
-from typing import Any, Callable
+from typing import Any
 
 from tqdm import tqdm
 

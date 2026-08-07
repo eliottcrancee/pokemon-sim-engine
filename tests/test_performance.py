@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import time
 import random
-
-import pytest
+import time
 
 from joblib import Parallel, cpu_count, delayed
 
