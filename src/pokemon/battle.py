@@ -9,13 +9,23 @@ from pokemon.trainer import Trainer
 
 
 class Battle:
-    __slots__ = ("trainers", "max_rounds", "round", "winner", "tie", "headless")
+    __slots__ = (
+        "trainers",
+        "max_rounds",
+        "round",
+        "winner",
+        "tie",
+        "headless",
+        "seed",
+        "_rng",
+    )
 
     def __init__(
         self,
         trainers: tuple[Trainer, Trainer],
         max_rounds: int = 200,
         headless: bool = True,
+        seed: int | None = None,
     ):
         self.trainers = trainers
         self.max_rounds = max_rounds
@@ -23,7 +33,23 @@ class Battle:
         self.winner = None
         self.tie = False
         self.headless = headless
-        self.reset()
+        self.seed = self._normalize_seed(seed)
+        self._rng = random.Random(self.seed)
+        self.reset(reseed=False)
+
+    def _normalize_seed(self, seed: int | None) -> int:
+        if seed is not None:
+            return int(seed)
+        # Ensure auto-generated reseeds differ from current seed for deterministic tests.
+        candidate = random.getrandbits(64)
+        while getattr(self, "seed", None) == candidate:
+            candidate = random.getrandbits(64)
+        return candidate
+
+    def reseed(self, seed: int | None = None) -> int:
+        self.seed = self._normalize_seed(seed)
+        self._rng.seed(self.seed)
+        return self.seed
 
     def copy(self):
         cls = self.__class__
@@ -34,6 +60,9 @@ class Battle:
         new_battle.winner = self.winner
         new_battle.tie = self.tie
         new_battle.headless = self.headless
+        new_battle.seed = self.seed
+        new_battle._rng = random.Random()
+        new_battle._rng.setstate(self._rng.getstate())
         return new_battle
 
     def get_trainer_by_id(self, trainer_id: int) -> Trainer:
@@ -46,15 +75,32 @@ class Battle:
             self.trainers[0] == other.trainers[0]
             and self.trainers[1] == other.trainers[1]
             and self.round == other.round
+            and self.max_rounds == other.max_rounds
+            and self.winner == other.winner
+            and self.tie == other.tie
         )
 
     def __hash__(self):
-        return hash((self.trainers[0], self.trainers[1], self.round))
+        return hash(
+            (
+                self.trainers[0],
+                self.trainers[1],
+                self.round,
+                self.max_rounds,
+                self.winner,
+                self.tie,
+            )
+        )
 
     def __str__(self) -> str:
         return f"Battle {self.trainers[0]} VS {self.trainers[1]}"
 
-    def reset(self):
+    def reset(self, reseed: bool = False, seed: int | None = None):
+        if seed is not None:
+            self.reseed(seed)
+        elif reseed:
+            self.reseed()
+
         self.round = 0
         self.winner = None
         self.tie = False
@@ -129,13 +175,13 @@ class Battle:
         else:
             messages = [Message(f"{trainer.name}'s {user.surname} uses {move.name}!")]
 
-        can_attack, new_messages = user.can_attack()
+        can_attack, new_messages = user.can_attack(rng=self._rng)
         if not self.headless:
             messages.extend(new_messages)
 
         if can_attack:
             damage, base_damage, critical, stab, effectiveness = move.calculate_damage(
-                user, target
+                user, target, rng=self._rng
             )
             target.hp -= damage
             if not self.headless:
@@ -154,7 +200,14 @@ class Battle:
                     messages.append(Message(f"{user.surname}'s attack missed!"))
             messages.extend(
                 move.secondary_effect(
-                    user, target, damage, base_damage, critical, stab, effectiveness
+                    user,
+                    target,
+                    damage,
+                    base_damage,
+                    critical,
+                    stab,
+                    effectiveness,
+                    rng=self._rng,
                 )
             )
             if not target.is_alive:
@@ -216,11 +269,14 @@ class Battle:
         self.round += 1
         messages: list[Message] = []
 
-        p0 = self._get_action_priority(action_0, self.trainers[0])
-        p1 = self._get_action_priority(action_1, self.trainers[1])
+        trainer_0 = self.trainers[0]
+        trainer_1 = self.trainers[1]
 
-        speed_0 = self.trainers[0].active_pokemon.speed
-        speed_1 = self.trainers[1].active_pokemon.speed
+        p0 = self._get_action_priority(action_0, trainer_0)
+        p1 = self._get_action_priority(action_1, trainer_1)
+
+        speed_0 = trainer_0.active_pokemon.speed
+        speed_1 = trainer_1.active_pokemon.speed
 
         if p0 > p1:
             first_action_trainer_id = 0
@@ -231,17 +287,26 @@ class Battle:
         elif speed_1 > speed_0:
             first_action_trainer_id = 1
         else:
-            first_action_trainer_id = random.choice([0, 1])
+            first_action_trainer_id = self._rng.choice([0, 1])
 
-        actions = {0: action_0, 1: action_1}
-        trainers = {0: self.trainers[0], 1: self.trainers[1]}
-        opponents = {0: self.trainers[1], 1: self.trainers[0]}
+        if first_action_trainer_id == 0:
+            first_action = action_0
+            first_trainer = trainer_0
+            first_opponent = trainer_1
+            second_action = action_1
+            second_trainer = trainer_1
+            second_opponent = trainer_0
+        else:
+            first_action = action_1
+            first_trainer = trainer_1
+            first_opponent = trainer_0
+            second_action = action_0
+            second_trainer = trainer_0
+            second_opponent = trainer_1
 
         # Execute first action
         first_messages = self._execute_action(
-            actions[first_action_trainer_id],
-            trainers[first_action_trainer_id],
-            opponents[first_action_trainer_id],
+            first_action, first_trainer, first_opponent
         )
         if not self.headless:
             messages.extend(first_messages)
@@ -250,11 +315,10 @@ class Battle:
             return messages
 
         # Execute second action
-        second_action_trainer_id = 1 - first_action_trainer_id
         second_messages = self._execute_action(
-            actions[second_action_trainer_id],
-            trainers[second_action_trainer_id],
-            opponents[second_action_trainer_id],
+            second_action,
+            second_trainer,
+            second_opponent,
         )
         if not self.headless:
             messages.extend(second_messages)
@@ -263,10 +327,7 @@ class Battle:
             return messages
 
         # After-turn effects (poison, burn, etc.)
-        for pokemon in [
-            self.trainers[0].active_pokemon,
-            self.trainers[1].active_pokemon,
-        ]:
+        for pokemon in (trainer_0.active_pokemon, trainer_1.active_pokemon):
             if pokemon.is_alive:
                 after_turn_messages = pokemon.after_turn()
                 if after_turn_messages:

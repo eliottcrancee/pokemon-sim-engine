@@ -39,6 +39,28 @@ _ACCURACY_MODIFIERS: Final[tuple[float, ...]] = (
 )
 
 
+def _roll_hit(
+    accuracy: int,
+    acc_stage: int,
+    rng: random.Random | None = None,
+) -> bool:
+    """
+    Rolls whether a move with the given accuracy hits the target, taking the
+    target accuracy stage (-6..+6) into account.
+
+    A move with accuracy >= 100 is unaffected by accuracy stages (a stage
+    modifier can never make a 100-accuracy move miss in the main games). Moves
+    with accuracy > 100 (used to model "never miss") always hit.
+    """
+    random_source = rng if rng is not None else random
+    if accuracy >= 100:
+        return True
+    # Map the accuracy stage index (-6 to +6) to the array index (0 to 12)
+    acc_idx = max(0, min(12, acc_stage + 6))
+    hit_threshold = (accuracy * _ACCURACY_MODIFIERS[acc_idx]) / 100.0
+    return random_source.random() < hit_threshold
+
+
 @unique
 class MoveCategory(IntEnum):
     """Enumeration for move categories (Physical, Special, Status)."""
@@ -63,26 +85,25 @@ def _calculate_base_damage(
     stab: bool,
     accuracy: int,
     acc_stage: int,
+    rng: random.Random | None = None,
 ) -> tuple[int, int, bool, bool, float]:
     """
     A pure and optimized function for damage calculation.
     Detached from the class to be testable in isolation.
     """
 
-    # Map the accuracy stage index (-6 to +6) to the array index (0 to 12)
-    acc_idx = max(0, min(12, acc_stage + 6))
-    hit_threshold = (accuracy * _ACCURACY_MODIFIERS[acc_idx]) / 100.0
+    random_source = rng if rng is not None else random
 
-    if random.random() >= hit_threshold:
+    if not _roll_hit(accuracy, acc_stage, random_source):
         return 0, 0, False, stab, effectiveness
 
     # Standard Pokémon damage formula (approximated)
     raw_dmg = (level_factor * power * (atk / defi)) / 50 + 2
 
     # Random factor [0.85, 1.0]
-    multiplier = effectiveness * (0.85 + 0.15 * random.random())
+    multiplier = effectiveness * (0.85 + 0.15 * random_source.random())
 
-    is_critical = random.random() < 0.0625
+    is_critical = random_source.random() < 0.0625
     if is_critical:
         multiplier *= 2.0
 
@@ -112,6 +133,7 @@ class Move(ABC):
         "pp",
         "max_pp",
         "priority",
+        "always_hits",
     )
 
     def __init__(
@@ -123,6 +145,7 @@ class Move(ABC):
         accuracy: int,
         pp: int,
         priority: int = 0,
+        always_hits: bool = False,
     ):
         self.id: int = -1  # Will be assigned by the registry
         self.name = name
@@ -133,9 +156,10 @@ class Move(ABC):
         self.pp = pp
         self.max_pp = pp  # To restore PP
         self.priority = priority
+        self.always_hits = always_hits
 
     def calculate_damage(
-        self, user: Pokemon, target: Pokemon
+        self, user: Pokemon, target: Pokemon, rng: random.Random | None = None
     ) -> tuple[int, int, bool, bool, float]:
         """
         Orchestrates stat retrieval and calls the pure calculation logic.
@@ -162,8 +186,9 @@ class Move(ABC):
             user.level_factor,
             effectiveness,
             stab,
-            self.accuracy,
+            self.accuracy if not self.always_hits else 100,
             acc_stage,
+            rng,
         )
 
     def secondary_effect(
@@ -175,6 +200,7 @@ class Move(ABC):
         critical: bool,
         stab: bool,
         effectiveness: float,
+        rng: random.Random | None = None,
     ) -> list[Message]:
         """Hook for secondary effects. By default, no effect."""
         return []
@@ -205,8 +231,11 @@ class SimpleMove(Move):
         accuracy: int,
         pp: int,
         priority: int = 0,
+        always_hits: bool = False,
     ):
-        super().__init__(name, category, p_type, power, accuracy, pp, priority)
+        super().__init__(
+            name, category, p_type, power, accuracy, pp, priority, always_hits
+        )
 
 
 class StatMove(Move):
@@ -230,8 +259,18 @@ class StatMove(Move):
         self_target: bool = False,
         accuracy: int = 100,
         priority: int = 0,
+        always_hits: bool = False,
     ):
-        super().__init__(name, MoveCategory.STATUS, p_type, 0, accuracy, pp, priority)
+        super().__init__(
+            name,
+            MoveCategory.STATUS,
+            p_type,
+            0,
+            accuracy,
+            pp,
+            priority,
+            always_hits,
+        )
         self._stat_name = stat
 
         if stat.lower() == "accuracy":
@@ -255,8 +294,21 @@ class StatMove(Move):
         critical: bool,
         stab: bool,
         effectiveness: float,
+        rng: random.Random | None = None,
     ) -> list[Message]:
         """Applies the stat modification."""
+        random_source = rng if rng is not None else random
+
+        # Accuracy: self-buffs always succeed. Opponent debuffs roll accuracy
+        # scaled by the move user's accuracy stage (unless it always hits),
+        # matching the convention used for damaging moves.
+        if (
+            not self.self_target
+            and not self.always_hits
+            and not _roll_hit(self.accuracy, user._accuracy_stage, random_source)
+        ):
+            return [Message("The attack missed!")]
+
         affected = user if self.self_target else target
 
         msgs = []
@@ -301,6 +353,7 @@ class ApplyStatusMove(Move):
         "effect_chance",
         "duration",
         "self_target",
+        "accuracy_stages",
     )
 
     def __init__(
@@ -317,13 +370,18 @@ class ApplyStatusMove(Move):
         volatile_status: str | None = None,
         duration: tuple[int, int] | None = None,
         self_target: bool = False,
+        accuracy_stages: int = 0,
+        always_hits: bool = False,
     ):
-        super().__init__(name, category, p_type, power, accuracy, pp, priority)
+        super().__init__(
+            name, category, p_type, power, accuracy, pp, priority, always_hits
+        )
         self.status_to_apply = status_to_apply
         self.volatile_status = volatile_status
         self.effect_chance = effect_chance
         self.duration = duration
         self.self_target = self_target
+        self.accuracy_stages = accuracy_stages
 
     def secondary_effect(
         self,
@@ -334,17 +392,27 @@ class ApplyStatusMove(Move):
         critical: bool,
         stab: bool,
         effectiveness: float,
+        rng: random.Random | None = None,
     ) -> list[Message]:
+        random_source = rng if rng is not None else random
+
         # For damaging moves, only apply effect if damage was dealt.
         if self.power > 0 and damage_dealt == 0:
             return []
 
-        # For pure status moves, check accuracy hit in the damage calc phase
-        # Here we just check the effect chance.
-        if random.random() > self.effect_chance:
+        affected = user if self.self_target else target
+
+        # Pure status moves (power == 0) are not rolled for accuracy in
+        # calculate_damage (it returns early for STATUS). Roll the hit here,
+        # scaled by the user's accuracy stage. Damaging moves already rolled
+        # their accuracy in calculate_damage.
+        if self.power == 0 and not self._move_hits(user, rng=random_source):
+            return [Message("The attack missed!")]
+
+        # Then check the effect chance.
+        if random_source.random() > self.effect_chance:
             return []
 
-        affected = user if self.self_target else target
         msgs = []
 
         # Apply non-volatile status
@@ -355,13 +423,13 @@ class ApplyStatusMove(Move):
                 Message(f"{affected.surname} was afflicted with {status_name}!")
             )
             if self.status_to_apply == PokemonStatus.SLEEP and self.duration:
-                affected._sleep_turns = random.randint(*self.duration)
+                affected._sleep_turns = random_source.randint(*self.duration)
 
         # Apply volatile status
         if self.volatile_status == "confuse" and not affected.confused:
             affected.confused = True
             if self.duration:
-                affected._confused_turns = random.randint(*self.duration)
+                affected._confused_turns = random_source.randint(*self.duration)
             msgs.append(Message(f"{affected.surname} became confused!"))
 
         elif self.volatile_status == "taunt" and not affected.taunted:
@@ -370,7 +438,26 @@ class ApplyStatusMove(Move):
             affected._taunted_turns = self.duration[0] if self.duration else 3
             msgs.append(Message(f"{affected.surname} was taunted!"))
 
+        elif self.volatile_status == "accuracy" and self.accuracy_stages:
+            affected.apply_accuracy_modifier(self.accuracy_stages)
+            adv = "rose" if self.accuracy_stages > 0 else "fell"
+            msgs.append(
+                Message(f"{affected.surname}'s accuracy {adv}!")
+            )
+
         return msgs
+
+    def _move_hits(self, user: Pokemon, rng: random.Random) -> bool:
+        """
+        Rolls the raw accuracy of a pure status move, unless it always hits.
+
+        Matches the damaging-move convention in ``calculate_damage``: the
+        move user's accuracy stage scales its own accuracy (e.g. a Pokemon
+        whose accuracy was lowered by Sand Attack is more likely to miss).
+        """
+        if self.always_hits:
+            return True
+        return _roll_hit(self.accuracy, user._accuracy_stage, rng)
 
 
 class RecoilMove(Move):
@@ -388,8 +475,11 @@ class RecoilMove(Move):
         pp: int,
         recoil_ratio: float = 0.25,
         priority: int = 0,
+        always_hits: bool = False,
     ):
-        super().__init__(name, category, p_type, power, accuracy, pp, priority)
+        super().__init__(
+            name, category, p_type, power, accuracy, pp, priority, always_hits
+        )
         self.recoil_ratio = recoil_ratio
 
     def secondary_effect(
@@ -401,6 +491,7 @@ class RecoilMove(Move):
         critical: bool,
         stab: bool,
         effectiveness: float,
+        rng: random.Random | None = None,
     ) -> list[Message]:
         """Applies recoil damage to the user."""
         if damage_dealt > 0:
@@ -435,6 +526,7 @@ class StruggleMove(RecoilMove):
         critical: bool,
         stab: bool,
         effectiveness: float,
+        rng: random.Random | None = None,
     ) -> list[Message]:
         """
         Struggle has a unique mechanic: 25% of max HP in recoil,
@@ -752,8 +844,14 @@ Bubble = MoveRegistry.register(
 )
 AuraSphere = MoveRegistry.register(
     SimpleMove(
-        "Aura Sphere", MoveCategory.SPECIAL, PokemonType.FIGHTING, 80, 101, 20
-    )  # 101 Accuracy for 'never miss'
+        "Aura Sphere",
+        MoveCategory.SPECIAL,
+        PokemonType.FIGHTING,
+        80,
+        100,
+        20,
+        always_hits=True,
+    )
 )
 DragonPulse = MoveRegistry.register(
     SimpleMove("Dragon Pulse", MoveCategory.SPECIAL, PokemonType.DRAGON, 85, 100, 10)
@@ -821,6 +919,7 @@ MudSlap = MoveRegistry.register(
         100,
         10,
         volatile_status="accuracy",
+        accuracy_stages=-1,
     )
 )
 

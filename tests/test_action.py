@@ -34,3 +34,21 @@ def test_action_accessor_wrong_type_raises() -> None:
     attack = Action.create_attack(0)
     with pytest.raises(ValueError):
         _ = attack.switch_pokemon_index
+
+
+def test_action_hashing_deduplicates_equal_actions() -> None:
+    a1 = Action.create_attack(1)
+    a2 = Action.create_attack(1)
+    a3 = Action.create_switch(1)
+
+    actions = {a1, a2, a3}
+
+    assert len(actions) == 2
+    assert a2 in actions
+
+
+def test_action_is_valid_dict_key() -> None:
+    action = Action.create_use_item(0, 0)
+    cache = {action: 123.0}
+
+    assert cache[Action.create_use_item(0, 0)] == 123.0

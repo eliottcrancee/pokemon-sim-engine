@@ -1,290 +1,732 @@
+from __future__ import annotations
+
+import os
+import statistics
 import time
-import timeit
-from typing import Any
+from dataclasses import dataclass
+from itertools import product
+from pathlib import Path
+from typing import Any, Callable
 
 from tqdm import tqdm
 
 from pokemon.agents import (
+    AlphaBetaAgent,
     BaseAgent,
     BestAttackAgent,
     BestAttackAndPotionAgent,
+    CachePrecomputeReport,
     InputAgent,
+    IterativeDeepeningAlphaBetaAgent,
+    MCTSAgent,
+    MinimaxAgent,
+    MonteCarloExpectiminimaxAgent,
     OneStepUniformExpectimaxAgent,
     RandomAgent,
     RandomAttackAgent,
+    RandomAttackAndPotionAgent,
+    RiskAwareExpectimaxAgent,
     SmarterHeuristicAgent,
+    precompute_shared_action_cache,
 )
 from pokemon.battle import Battle
 from pokemon.battle_registry import BattleRegistry
 from pokemon.play import play_multiple, play_tournament
 from pokemon.ui import play_ui
 
-AGENT_POOL: list[BaseAgent] = [
-    RandomAgent(),
-    RandomAttackAgent(),
-    BestAttackAgent(),
-    BestAttackAndPotionAgent(),
-    SmarterHeuristicAgent(),
-    OneStepUniformExpectimaxAgent(),
-    # AlphaBetaAgent(depth=1),
+
+@dataclass(frozen=True, slots=True)
+class AgentEntry:
+    key: str
+    label: str
+    factory: Callable[[], BaseAgent]
+
+
+@dataclass(frozen=True, slots=True)
+class MenuAction:
+    key: str
+    label: str
+    handler: Callable[[], None]
+
+
+AGENT_CATALOG: list[AgentEntry] = [
+    AgentEntry("random", "Random (all actions)", lambda: RandomAgent()),
+    AgentEntry("random_attack", "Random Attack", lambda: RandomAttackAgent()),
+    AgentEntry("best_attack", "Best Attack", lambda: BestAttackAgent()),
+    AgentEntry(
+        "best_attack_potion",
+        "Best Attack + Potion",
+        lambda: BestAttackAndPotionAgent(),
+    ),
+    AgentEntry(
+        "smarter_heuristic",
+        "Smarter Heuristic",
+        lambda: SmarterHeuristicAgent(),
+    ),
+    AgentEntry(
+        "uniform_expectimax",
+        "One-Step Uniform Expectimax",
+        lambda: OneStepUniformExpectimaxAgent(),
+    ),
+    AgentEntry(
+        "minimax_d2_cache",
+        "Minimax d=2 (root cache)",
+        lambda: MinimaxAgent(depth=2, use_cache=True),
+    ),
+    AgentEntry(
+        "minimax_d2_nocache",
+        "Minimax d=2 (no cache)",
+        lambda: MinimaxAgent(depth=2, use_cache=False),
+    ),
+    AgentEntry(
+        "alphabeta_d2_cache",
+        "Alpha-Beta d=2 (root cache)",
+        lambda: AlphaBetaAgent(depth=2, use_cache=True),
+    ),
+    AgentEntry(
+        "alphabeta_d2_nocache",
+        "Alpha-Beta d=2 (no cache)",
+        lambda: AlphaBetaAgent(depth=2, use_cache=False),
+    ),
+    AgentEntry(
+        "risk_expectimax",
+        "Risk-Aware Expectimax",
+        lambda: RiskAwareExpectimaxAgent(depth=1),
+    ),
+    AgentEntry(
+        "mc_expectiminimax",
+        "Monte Carlo Expectiminimax",
+        lambda: MonteCarloExpectiminimaxAgent(depth=1),
+    ),
+    AgentEntry(
+        "iterative_alphabeta",
+        "Iterative Deepening Alpha-Beta",
+        lambda: IterativeDeepeningAlphaBetaAgent(max_depth=3, time_limit=1.0),
+    ),
+    AgentEntry("mcts", "MCTS", lambda: MCTSAgent(time_limit=1.0, rollout_depth=8)),
 ]
 
+# Agents used as fixed baselines in sweep mode.
+BASELINE_AGENT_KEYS: tuple[str, ...] = (
+    "random",
+    "random_attack",
+    "best_attack",
+    "best_attack_potion",
+    "smarter_heuristic",
+    "uniform_expectimax",
+)
 
-def select_from_list(prompt: str, options: list[Any]) -> int:
-    """Generic helper to select an item from a list by its index."""
-    print(prompt)
-    for i, option in enumerate(options, 1):
-        print(f"  [{i}] {option}")
+SWEEP_FAMILIES: list[type[BaseAgent]] = [
+    AlphaBetaAgent,
+    MinimaxAgent,
+    IterativeDeepeningAlphaBetaAgent,
+    MCTSAgent,
+    MonteCarloExpectiminimaxAgent,
+    RiskAwareExpectimaxAgent,
+    SmarterHeuristicAgent,
+    BestAttackAndPotionAgent,
+    RandomAttackAndPotionAgent,
+]
+
+_CACHE_DIR = Path(".cache")
+_MINIMAX_CACHE_FILE = _CACHE_DIR / "minimax_root_cache.pkl"
+_ALPHABETA_CACHE_FILE = _CACHE_DIR / "alphabeta_root_cache.pkl"
+
+
+def _load_persistent_search_caches() -> None:
+    MinimaxAgent.load_shared_cache(_MINIMAX_CACHE_FILE)
+    AlphaBetaAgent.load_shared_cache(_ALPHABETA_CACHE_FILE)
+
+
+def _save_persistent_search_caches() -> None:
+    MinimaxAgent.save_shared_cache(_MINIMAX_CACHE_FILE)
+    AlphaBetaAgent.save_shared_cache(_ALPHABETA_CACHE_FILE)
+
+
+def _family_display_name(agent_cls: type[BaseAgent]) -> str:
+    explicit = getattr(agent_cls, "SWEEP_DISPLAY_NAME", None)
+    if isinstance(explicit, str) and explicit.strip():
+        return explicit.strip()
+
+    raw = agent_cls.__name__.replace("Agent", "")
+    tokens: list[str] = []
+    current = ""
+    for char in raw:
+        if char.isupper() and current:
+            tokens.append(current)
+            current = char
+        else:
+            current += char
+    if current:
+        tokens.append(current)
+    return " ".join(tokens)
+
+
+def _agent_entry_map() -> dict[str, AgentEntry]:
+    return {entry.key: entry for entry in AGENT_CATALOG}
+
+
+def _safe_input(prompt: str) -> str:
+    return input(prompt).strip()
+
+
+def _prompt_int(prompt: str, minimum: int = 1, default: int | None = None) -> int:
     while True:
+        suffix = f" [{default}]" if default is not None else ""
+        raw = _safe_input(f"{prompt}{suffix}: ")
+        if not raw and default is not None:
+            return default
         try:
-            choice = int(input("> "))
-            if 1 <= choice <= len(options):
-                return choice - 1
-            else:
-                print("Invalid choice. Please try again.")
+            value = int(raw)
+            if value < minimum:
+                print(f"Value must be >= {minimum}.")
+                continue
+            return value
         except ValueError:
-            print("Please enter a number.")
+            print("Please enter a valid integer.")
 
 
-def select_agent(prompt: str) -> "BaseAgent":
-    """Lets the user select an agent from the AGENT_POOL."""
-    agent_index = select_from_list(prompt, AGENT_POOL)
-    return AGENT_POOL[agent_index]
+def _prompt_optional_int(prompt: str) -> int | None:
+    while True:
+        raw = _safe_input(f"{prompt} [empty=random]: ")
+        if not raw:
+            return None
+        try:
+            return int(raw)
+        except ValueError:
+            print("Please enter a valid integer or empty.")
 
 
-def get_battle_description(battle: "Battle") -> str:
-    """Creates a descriptive string for a battle."""
-    t1 = battle.trainers[0]
-    t2 = battle.trainers[1]
+def _prompt_optional_positive_int(prompt: str) -> int | None:
+    while True:
+        raw = _safe_input(f"{prompt} [empty=disabled]: ")
+        if not raw:
+            return None
+        try:
+            value = int(raw)
+            if value < 1:
+                print("Value must be >= 1.")
+                continue
+            return value
+        except ValueError:
+            print("Please enter a valid positive integer or empty.")
 
-    t1_team = ", ".join([f"{p.name} (L{p.level})" for p in t1.pokemon_team])
-    t2_team = ", ".join([f"{p.name} (L{p.level})" for p in t2.pokemon_team])
 
-    return f"{t1.name} [{t1_team}] vs. {t2.name} [{t2_team}]"
+def _prompt_yes_no(prompt: str, default: bool = True) -> bool:
+    default_text = "Y/n" if default else "y/N"
+    while True:
+        raw = _safe_input(f"{prompt} [{default_text}]: ").lower()
+        if not raw:
+            return default
+        if raw in {"y", "yes"}:
+            return True
+        if raw in {"n", "no"}:
+            return False
+        print("Please answer with 'y' or 'n'.")
 
 
-def select_battle_verbose() -> tuple[str, "Battle"]:
-    """
-    Lets the user select a battle, displaying verbose descriptions.
-    Returns the name of the battle and the Battle object.
-    """
+def _select_from_list(prompt: str, options: list[str]) -> int:
+    print(f"\n{prompt}")
+    for index, option in enumerate(options, 1):
+        print(f"  [{index}] {option}")
+
+    while True:
+        raw = _safe_input("> ")
+        try:
+            selected = int(raw)
+            if 1 <= selected <= len(options):
+                return selected - 1
+            print(f"Please enter a number between 1 and {len(options)}.")
+        except ValueError:
+            print("Please enter a valid number.")
+
+
+def _build_battle_description(battle: Battle) -> str:
+    def describe_trainer(trainer) -> str:
+        team = ", ".join(f"{p.name} L{p.level}" for p in trainer.pokemon_team)
+        return f"{trainer.name}: {team}"
+
+    return (
+        f"{describe_trainer(battle.trainers[0])} | "
+        f"{describe_trainer(battle.trainers[1])}"
+    )
+
+
+def _select_battle(prompt_seed: bool = True) -> tuple[str, Battle]:
     battle_names = BattleRegistry.list_battles()
-    descriptions = []
+    if not battle_names:
+        raise RuntimeError("Battle registry is empty.")
+
+    labels: list[str] = []
     for name in battle_names:
         battle = BattleRegistry.get(name)
         if battle is None:
-            raise ValueError(f"Battle '{name}' not found in registry.")
-        descriptions.append(get_battle_description(battle))
+            raise RuntimeError(f"Battle '{name}' not found.")
+        labels.append(f"{name} -> {_build_battle_description(battle)}")
 
-    print("\nChoose a battle scenario:")
-    for i, name in enumerate(battle_names, 1):
-        print(f"  [{i}] {name}: {descriptions[i - 1]}")
+    selected_index = _select_from_list("Choose a battle scenario:", labels)
+    selected_name = battle_names[selected_index]
+    battle = BattleRegistry.get(selected_name)
+    if battle is None:
+        raise RuntimeError(f"Battle '{selected_name}' not found.")
 
-    while True:
+    if prompt_seed:
+        requested_seed = _prompt_optional_int("Seed")
+        if requested_seed is not None:
+            battle.reseed(requested_seed)
+            print(f"Seed fixed to {battle.seed}.")
+        else:
+            print(f"Using battle seed {battle.seed}.")
+    else:
+        print("Seed prompt skipped: this mode reseeds each battle automatically.")
+
+    return selected_name, battle
+
+
+def _select_agent(prompt: str) -> AgentEntry:
+    labels = [entry.label for entry in AGENT_CATALOG]
+    selected_index = _select_from_list(prompt, labels)
+    return AGENT_CATALOG[selected_index]
+
+
+def _is_cache_precomputable(agent: BaseAgent) -> bool:
+    if not bool(getattr(agent, "use_cache", False)):
+        return False
+    agent_cls = agent.__class__
+    return all(
+        callable(getattr(agent_cls, method_name, None))
+        for method_name in (
+            "clear_shared_cache",
+            "get_shared_cache_stats",
+            "export_shared_cache",
+            "merge_shared_cache",
+        )
+    )
+
+
+def _select_precomputable_agent(prompt: str) -> AgentEntry:
+    precomputable_entries: list[AgentEntry] = []
+    for entry in AGENT_CATALOG:
         try:
-            choice = int(input("> "))
-            if 1 <= choice <= len(battle_names):
-                selected_name = battle_names[choice - 1]
-                selected_battle = BattleRegistry.get(selected_name)
-                if selected_battle is None:
-                    raise ValueError(f"Battle '{selected_name}' not found in registry.")
-                return selected_name, selected_battle
+            candidate = entry.factory()
+        except Exception:
+            continue
+        if _is_cache_precomputable(candidate):
+            precomputable_entries.append(entry)
+
+    if not precomputable_entries:
+        raise RuntimeError("No precomputable cache agents found in catalog.")
+
+    labels = [entry.label for entry in precomputable_entries]
+    selected_index = _select_from_list(prompt, labels)
+    return precomputable_entries[selected_index]
+
+
+def _parse_csv_values(raw: str, kind: str, default_values: list[Any]) -> list[Any]:
+    text = raw.strip()
+    if not text:
+        return default_values
+
+    values = [part.strip() for part in text.split(",") if part.strip()]
+    if kind == "bool":
+        truthy = {"1", "true", "t", "yes", "y", "on"}
+        falsy = {"0", "false", "f", "no", "n", "off"}
+        parsed: list[bool] = []
+        for token in values:
+            lowered = token.lower()
+            if lowered in truthy:
+                parsed.append(True)
+            elif lowered in falsy:
+                parsed.append(False)
             else:
-                print("Invalid choice. Please try again.")
-        except ValueError:
-            print("Please enter a number.")
+                raise ValueError(f"Invalid boolean token: {token}")
+        return parsed
+
+    if kind == "int":
+        parsed_ints = [int(token) for token in values]
+        if any(v <= 0 for v in parsed_ints):
+            raise ValueError("Integer values must be > 0")
+        return parsed_ints
+
+    if kind == "float":
+        parsed_floats = [float(token) for token in values]
+        return parsed_floats
+
+    raise ValueError(f"Unsupported parameter type: {kind}")
 
 
-def run_ui_mode():
-    """Play an interactive game against an AI."""
-    print("\n--- UI Mode ---")
-    opponent = select_agent("Choose your opponent:")
-    battle_name, battle = select_battle_verbose()
+def _infer_kind(values: list[Any]) -> str:
+    if not values:
+        raise ValueError("Default sweep parameter values cannot be empty.")
+    sample = values[0]
+    if isinstance(sample, bool):
+        return "bool"
+    if isinstance(sample, int):
+        return "int"
+    if isinstance(sample, float):
+        return "float"
+    raise ValueError(f"Unsupported sweep parameter type: {type(sample).__name__}")
+
+
+def _generate_sweep_agents(agent_cls: type[BaseAgent]) -> list[BaseAgent]:
+    defaults = getattr(agent_cls, "DEFAULT_SWEEP_PARAMS", None)
+    if not isinstance(defaults, dict) or not defaults:
+        raise ValueError(f"{agent_cls.__name__} has no DEFAULT_SWEEP_PARAMS")
+
+    keys: list[str] = []
+    value_lists: list[list[Any]] = []
+
+    for param_name, default_values in defaults.items():
+        kind = _infer_kind(default_values)
+        default_text = ",".join(str(v) for v in default_values)
+        raw = _safe_input(f"{param_name} values (default {default_text}): ")
+        values = _parse_csv_values(raw, kind, default_values)
+        keys.append(param_name)
+        value_lists.append(values)
+
+    combinations = [dict(zip(keys, combo)) for combo in product(*value_lists)]
+    return [agent_cls(**kwargs) for kwargs in combinations]
+
+
+def _print_battle_results(
+    agent_left: BaseAgent,
+    agent_right: BaseAgent,
+    wins_left: int,
+    draws: int,
+    wins_right: int,
+    n_battles: int,
+) -> None:
+    print("\nResults")
+    print(f"- {agent_left.name}: {wins_left} ({wins_left / n_battles:.1%})")
+    print(f"- {agent_right.name}: {wins_right} ({wins_right / n_battles:.1%})")
+    print(f"- Draws: {draws} ({draws / n_battles:.1%})")
+
+
+def _print_rankings(agents: list[BaseAgent], title: str) -> None:
+    if not agents:
+        print("No ranking to display.")
+        return
+
+    max_name = max(len(a.name) for a in agents)
+    print(f"\n{title}")
+    header = f"{'Rank':<5} {'Agent':<{max_name}} {'Rating':>8} {'RD':>8}"
+    print(header)
+    print("-" * len(header))
+    for index, agent in enumerate(agents, 1):
+        print(
+            f"{index:<5} {agent.name:<{max_name}} "
+            f"{agent.rating:>8.2f} {agent.rating_deviation:>8.2f}"
+        )
+
+
+def run_ui_duel() -> None:
+    print("\n=== UI Duel ===")
+    opponent_entry = _select_agent("Choose the AI opponent:")
+    battle_name, battle = _select_battle()
+
+    print(f"Launching UI duel on '{battle_name}' against {opponent_entry.label}...")
+    time.sleep(0.6)
+
     player = InputAgent()
-
-    print(f"\nStarting UI battle: You vs. {opponent.name} in '{battle_name}'")
-    print("Loading...")
-    time.sleep(1)
-
+    opponent = opponent_entry.factory()
     play_ui(battle, player, opponent)
 
 
-def run_agent_vs_agent_mode():
-    """Run a simulation between two agents."""
-    print("\n--- Agent vs. Agent Mode ---")
-    agent1 = select_agent("Choose Agent 1:")
-    agent2 = select_agent("Choose Agent 2:")
-    battle_name, battle = select_battle_verbose()
+def run_agent_vs_agent() -> None:
+    print("\n=== Agent vs Agent ===")
+    left_entry = _select_agent("Choose Agent 1:")
+    right_entry = _select_agent("Choose Agent 2:")
+    battle_name, battle = _select_battle(prompt_seed=False)
+    n_battles = _prompt_int("Number of battles", minimum=1, default=50)
 
-    while True:
-        try:
-            n_battles = int(input("Enter number of battles to simulate: "))
-            if n_battles > 0:
-                break
-            else:
-                print("Please enter a positive number.")
-        except ValueError:
-            print("Please enter a valid number.")
+    left = left_entry.factory()
+    right = right_entry.factory()
 
     print(
-        f"\nRunning {n_battles} battles for '{battle_name}' between '{agent1.name}' and '{agent2.name}'..."
+        f"Running {n_battles} battles on '{battle_name}' -> {left.name} vs {right.name}"
     )
 
-    wins1, draws, wins2 = play_multiple(
+    wins_left, draws, wins_right = play_multiple(
         battle=battle,
-        agent_0=agent1,
-        agent_1=agent2,
+        agent_0=left,
+        agent_1=right,
         n_battles=n_battles,
         n_jobs=-1,
-        verbose=True,
+        verbose=False,
+        reseed_each_battle=True,
     )
 
-    print("\n--- Simulation Results ---")
-    print(f"{agent1.name} Wins: {wins1} ({wins1 / n_battles:.1%})")
-    print(f"{agent2.name} Wins: {wins2} ({wins2 / n_battles:.1%})")
-    print(f"Draws: {draws} ({draws / n_battles:.1%})")
-    print("--------------------------")
+    _print_battle_results(left, right, wins_left, draws, wins_right, n_battles)
 
 
-def run_tournament_mode():
-    """Run a tournament with a pool of agents."""
-    print("\n--- Tournament Mode ---")
-    battle_name, battle = select_battle_verbose()
+def run_tournament() -> None:
+    print("\n=== Tournament (Glicko-2) ===")
+    battle_name, battle = _select_battle(prompt_seed=False)
+    n_matches = _prompt_int("Total matches", minimum=1, default=150)
+    n_battles_per_match = _prompt_int("Battles per match", minimum=1, default=5)
 
-    while True:
-        try:
-            n_matches = int(input("Enter total number of matches to run: "))
-            n_battles_per_match = int(input("Enter battles per match: "))
-            if n_matches > 0 and n_battles_per_match > 0:
-                break
-            else:
-                print("Please enter positive numbers.")
-        except ValueError:
-            print("Please enter valid numbers.")
+    entry_map = _agent_entry_map()
+    pool: list[BaseAgent] = [entry_map[key].factory() for key in BASELINE_AGENT_KEYS]
 
-    print(f"\nStarting tournament for '{battle_name}'...")
+    print(
+        f"Running tournament on '{battle_name}' with {len(pool)} agents, "
+        f"{n_matches} matches, {n_battles_per_match} battles per match."
+    )
 
-    final_rankings = play_tournament(
-        agent_pool=AGENT_POOL,
+    rankings = play_tournament(
+        agent_pool=pool,
         battle=battle,
         n_matches=n_matches,
         n_battles_per_match=n_battles_per_match,
+        reseed_each_battle=True,
     )
-
-    max_name_length = max(len(agent.name) for agent in final_rankings)
-
-    print("\n--- Final Tournament Rankings ---")
-    print(f"{'Rank':<5} {'Agent':<{max_name_length}} {'Rating':<10} {'Deviation':<10}")
-    print("-" * (5 + max_name_length + 10 + 10 + 3))
-    for i, agent in enumerate(final_rankings, 1):
-        print(
-            f"{i:<5} {agent.name:<{max_name_length}} {agent.rating:<10.2f} {agent.rating_deviation:<10.2f}"
-        )
-    print("-" * (5 + max_name_length + 10 + 10 + 3))
+    _print_rankings(rankings, "Final rankings")
 
 
-def _perform_agent_action(agent, battle_template):
-    """Helper function to be timed by timeit."""
-    battle_instance = battle_template.copy()
-    _ = agent.get_action(battle_instance, 0)
+def run_hyperparameter_sweep() -> None:
+    print("\n=== Hyperparameter Sweep ===")
+    battle_name, battle = _select_battle(prompt_seed=False)
 
+    family_labels = [_family_display_name(cls) for cls in SWEEP_FAMILIES]
+    family_index = _select_from_list("Choose an agent family to sweep:", family_labels)
+    family_cls = SWEEP_FAMILIES[family_index]
+    family_label = family_labels[family_index]
 
-def run_performance_test_mode():
-    """Test the performance (execution time) of an agent's get_action method."""
-    print("\n--- Agent Performance Test Mode ---")
-
-    agent_instance = select_agent("Select agent to test performance:")
-    battle_name, battle_template = select_battle_verbose()
-
-    if battle_template is None:
-        print("Invalid battle selected. Returning to main menu.")
+    variants = _generate_sweep_agents(family_cls)
+    if not variants:
+        print("No variants generated.")
         return
 
-    while True:
-        try:
-            num_repetitions = int(
-                input("Enter number of repetitions for timeit (e.g., 100): ")
-            )
-            if num_repetitions > 0:
-                break
-            else:
-                print("Please enter a positive number.")
-        except ValueError:
-            print("Please enter a valid number.")
+    n_matches = _prompt_int("Total matches", minimum=1, default=200)
+    n_battles_per_match = _prompt_int("Battles per match", minimum=1, default=5)
+
+    entry_map = _agent_entry_map()
+    baseline_agents: list[BaseAgent] = [
+        entry_map[key].factory() for key in BASELINE_AGENT_KEYS
+    ]
 
     print(
-        f"\nMeasuring performance of '{agent_instance.name}' on '{battle_name}' for {num_repetitions} repetitions..."
+        f"Running sweep for '{family_label}' on '{battle_name}' "
+        f"with {len(variants)} variants."
     )
 
-    timer = timeit.Timer(lambda: _perform_agent_action(agent_instance, battle_template))
+    full_pool = baseline_agents + variants
+    rankings = play_tournament(
+        agent_pool=full_pool,
+        battle=battle,
+        n_matches=n_matches,
+        n_battles_per_match=n_battles_per_match,
+        reseed_each_battle=True,
+    )
 
-    try:
-        times = []
-        for _ in tqdm(range(num_repetitions), desc="Running Performance Test"):
-            times.append(timer.timeit(number=1))
+    variant_names = {agent.name for agent in variants}
+    variant_rankings = [agent for agent in rankings if agent.name in variant_names]
 
-        min_time = min(times)
-        max_time = max(times)
-        avg_time = sum(times) / len(times)
-        std_dev = (
-            (sum((x - avg_time) ** 2 for x in times) / len(times)) ** 0.5
-            if len(times) > 1
-            else 0.0
-        )
+    _print_rankings(variant_rankings, f"Sweep rankings: {family_label}")
 
-        print("\n--- Performance Results ---")
-        print(f"Agent: {agent_instance.name}")
-        print(f"Battle: {battle_name}")
-        print(f"Number of individual calls measured: {num_repetitions}")
-        print(f"Min time per call: {min_time:.6f} seconds")
-        print(f"Max time per call: {max_time:.6f} seconds")
-        print(f"Average time per call: {avg_time:.6f} seconds")
-        print(f"Standard deviation: {std_dev:.6f} seconds")
-        print("---------------------------")
 
-    except Exception as e:
-        print(f"\nAn error occurred during performance testing: {e}")
+def run_agent_benchmark() -> None:
+    print("\n=== Agent Action Benchmark ===")
+    entry = _select_agent("Choose an agent to benchmark:")
+    opponent_entry = _select_agent("Choose opponent agent:")
+    battle_name, battle_template = _select_battle(prompt_seed=False)
+    repetitions = _prompt_int("Number of full battles", minimum=1, default=100)
+
+    agent = entry.factory()
+    opponent = opponent_entry.factory()
+
+    cache_stats_getter = getattr(agent.__class__, "get_shared_cache_stats", None)
+    cache_clearer = getattr(agent.__class__, "clear_shared_cache", None)
+    if callable(cache_clearer):
+        cache_clearer()
+
+    battle_durations: list[float] = []
+    rounds_per_battle: list[int] = []
+    agent_call_durations: list[float] = []
+
+    progress = tqdm(range(repetitions), desc="Benchmark")
+    for index in progress:
+        battle_instance = battle_template.copy()
+        battle_instance.reset(reseed=True)
+
+        battle_start = time.perf_counter()
+        while not battle_instance.done:
+            call_start = time.perf_counter()
+            action_0 = agent.get_action(battle_instance, trainer_id=0, verbose=False)
+            agent_call_durations.append(time.perf_counter() - call_start)
+
+            action_1 = opponent.get_action(battle_instance, trainer_id=1, verbose=False)
+            battle_instance.turn(action_0, action_1)
+        battle_durations.append(time.perf_counter() - battle_start)
+        rounds_per_battle.append(battle_instance.round)
+
+        if callable(cache_stats_getter) and ((index + 1) % 25 == 0):
+            stats = cache_stats_getter()
+            progress.set_postfix(
+                {
+                    "hits": stats["hits"],
+                    "misses": stats["misses"],
+                    "size": stats["size"],
+                }
+            )
+
+    min_battle_time = min(battle_durations)
+    max_battle_time = max(battle_durations)
+    mean_battle_time = statistics.mean(battle_durations)
+    std_battle_time = (
+        statistics.pstdev(battle_durations) if len(battle_durations) > 1 else 0.0
+    )
+
+    total_rounds = sum(rounds_per_battle)
+    mean_rounds = statistics.mean(rounds_per_battle)
+    mean_battle_time_per_round = (
+        (sum(battle_durations) / total_rounds) if total_rounds > 0 else 0.0
+    )
+
+    min_agent_call = min(agent_call_durations)
+    max_agent_call = max(agent_call_durations)
+    mean_agent_call = statistics.mean(agent_call_durations)
+    std_agent_call = (
+        statistics.pstdev(agent_call_durations)
+        if len(agent_call_durations) > 1
+        else 0.0
+    )
+
+    print("\nBenchmark summary")
+    print(f"- Agent: {entry.label}")
+    print(f"- Opponent: {opponent_entry.label}")
+    print(f"- Battle: {battle_name}")
+    print(f"- Full battles: {repetitions}")
+    print(f"- Mean rounds per battle: {mean_rounds:.2f}")
+    print(f"- Total rounds: {total_rounds}")
+    print("\nFull battle timings")
+    print(f"- Min: {min_battle_time:.6f}s")
+    print(f"- Max: {max_battle_time:.6f}s")
+    print(f"- Mean: {mean_battle_time:.6f}s")
+    print(f"- Std Dev: {std_battle_time:.6f}s")
+    print(f"- Mean battle time / round: {mean_battle_time_per_round:.6f}s")
+    print("\nAgent get_action timings (trainer 0 only)")
+    print(f"- Calls measured: {len(agent_call_durations)}")
+    print(f"- Min: {min_agent_call:.6f}s")
+    print(f"- Max: {max_agent_call:.6f}s")
+    print(f"- Mean: {mean_agent_call:.6f}s")
+    print(f"- Std Dev: {std_agent_call:.6f}s")
+
+    if callable(cache_stats_getter):
+        stats = cache_stats_getter()
+        print("\nShared cache stats")
+        print(f"- Hits: {stats['hits']}")
+        print(f"- Misses: {stats['misses']}")
+        print(f"- Size: {stats['size']}")
+
+
+def run_cache_precompute() -> None:
+    print("\n=== Parallel Cache Precompute ===")
+    cache_entry = _select_precomputable_agent("Choose the cache-enabled agent:")
+    opponent_entry = _select_agent("Choose the opponent agent for rollout battles:")
+    battle_name, battle_template = _select_battle(prompt_seed=False)
+
+    total_battles = _prompt_int("Total battles to precompute", minimum=1, default=500)
+    cpu_total = max(1, os.cpu_count() or 1)
+    worker_count = _prompt_int("Parallel workers", minimum=1, default=cpu_total)
+    merge_every = _prompt_optional_positive_int("Incremental merge every X battles")
+    clear_before_merge = _prompt_yes_no(
+        "Clear existing shared cache before merge?", default=True
+    )
+
+    if worker_count < cpu_total:
         print(
-            "Please ensure the selected agent and battle are compatible and have valid actions."
+            f"Info: using {worker_count}/{cpu_total} logical CPUs "
+            "(set a higher value to increase utilization)."
         )
-        import traceback
 
-        traceback.print_exc()
+    cache_agent = cache_entry.factory()
+    cache_cls = cache_agent.__class__
+    get_shared_cache_stats = getattr(cache_cls, "get_shared_cache_stats", None)
+    if not callable(get_shared_cache_stats):
+        raise RuntimeError("Selected agent class does not support cache APIs.")
+
+    same_agent_selfplay = cache_entry.key == opponent_entry.key
+
+    print(
+        "Launching precompute with "
+        f"{worker_count} workers on '{battle_name}' "
+        f"({total_battles} battles total)."
+    )
+    if same_agent_selfplay:
+        print("Self-play detected: precompute will warm cache for trainer 0 and 1.")
+    if merge_every is not None:
+        print(f"Incremental merge enabled every {merge_every} battles.")
+        if merge_every < worker_count:
+            print(
+                "Warning: merge batch size is smaller than worker count; "
+                "some workers will stay idle. Increase merge_every for better CPU usage."
+            )
+
+    def _on_batch_progress(
+        batch_index: int, batch_total: int, completed: int, cache_size: int
+    ) -> None:
+        print(
+            f"Batch {batch_index}/{batch_total} merged "
+            f"({completed}/{total_battles} battles, cache size={cache_size})."
+        )
+
+    report: CachePrecomputeReport = precompute_shared_action_cache(
+        battle_template=battle_template,
+        cache_agent_factory=cache_entry.factory,
+        opponent_factory=opponent_entry.factory,
+        total_battles=total_battles,
+        workers=worker_count,
+        merge_every=merge_every,
+        clear_before_merge=clear_before_merge,
+        warm_both_sides=same_agent_selfplay,
+        progress_callback=_on_batch_progress,
+    )
+
+    print("\nPrecompute summary")
+    print(f"- Cache agent: {cache_entry.label}")
+    print(f"- Opponent: {opponent_entry.label}")
+    print(f"- Battle: {battle_name}")
+    print(f"- Total battles simulated: {report.total_battles}")
+    print(f"- Total rounds simulated: {report.total_rounds}")
+    print(f"- Workers used: {report.workers_used}")
+    print(f"- Batches: {report.batches}")
+    print(f"- Elapsed: {report.elapsed_seconds:.3f}s")
+    print(f"- Worker-level hits: {report.worker_hits}")
+    print(f"- Worker-level misses: {report.worker_misses}")
+    print(f"- New cache entries merged: {report.merged_entries}")
+    print(f"- Shared cache size after merge: {report.final_cache_size}")
 
 
-def main():
-    """
-    Main interactive menu for the Pokémon Playground.
-    """
+def main() -> None:
+    _load_persistent_search_caches()
+    menu_actions = [
+        MenuAction("ui", "UI duel (human vs AI)", run_ui_duel),
+        MenuAction("sim", "Agent vs Agent simulation", run_agent_vs_agent),
+        MenuAction("tour", "Tournament (Glicko-2)", run_tournament),
+        MenuAction("sweep", "Hyperparameter sweep", run_hyperparameter_sweep),
+        MenuAction("bench", "Agent action benchmark", run_agent_benchmark),
+        MenuAction("precompute", "Parallel cache precompute", run_cache_precompute),
+        MenuAction("quit", "Exit", lambda: None),
+    ]
+
     while True:
-        print("\nWelcome to the Pokémon Playground!")
-        print("What would you like to do?")
-        print("  [1] Play an interactive game (UI Mode)")
-        print("  [2] Simulate Agent vs. Agent")
-        print("  [3] Run a Tournament")
-        print("  [4] Test Agent Performance (Timeit)")
-        print("  [5] Exit")
+        options = [action.label for action in menu_actions]
+        selected_index = _select_from_list("Pokemon Playground - main menu", options)
+        selected_action = menu_actions[selected_index]
+
+        if selected_action.key == "quit":
+            _save_persistent_search_caches()
+            print("Exiting playground.")
+            return
 
         try:
-            choice = input("> ")
-            if choice == "1":
-                run_ui_mode()
-            elif choice == "2":
-                run_agent_vs_agent_mode()
-            elif choice == "3":
-                run_tournament_mode()
-            elif choice == "4":
-                run_performance_test_mode()
-            elif choice == "5":
-                print("Exiting playground. Goodbye!")
-                break
-            else:
-                print("Invalid choice. Please enter a number from 1 to 5.")
-        except Exception as e:
-            print(f"\nAn error occurred: {e}")
-            print("Returning to the main menu.")
+            selected_action.handler()
+            _save_persistent_search_caches()
+        except Exception as error:
+            print(f"\nError: {error}")
 
-        input("\nPress Enter to return to the main menu...")
+        _safe_input("\nPress Enter to return to the main menu...")
 
 
 if __name__ == "__main__":

@@ -53,10 +53,14 @@ class MoveSlot:
     def __eq__(self, other):
         if not isinstance(other, MoveSlot):
             return NotImplemented
-        return self.move.id == other.move.id and self.current_pp == other.current_pp
+        return (
+            self.move.id == other.move.id
+            and self.current_pp == other.current_pp
+            and self.max_pp == other.max_pp
+        )
 
     def __hash__(self):
-        return hash((self.move.id, self.current_pp))
+        return hash((self.move.id, self.current_pp, self.max_pp))
 
 
 @dataclass(frozen=True, slots=True)
@@ -426,8 +430,11 @@ class Pokemon:
 
         return new_p
 
-    def can_attack(self) -> tuple[bool, list[Message]]:
+    def can_attack(
+        self, rng: random.Random | None = None
+    ) -> tuple[bool, list[Message]]:
         msgs = []
+        random_source = rng if rng is not None else random
 
         # Optimistic check: if healthy and no volatile status, return immediately
         if self._status == PokemonStatus.HEALTHY and not self._confused:
@@ -435,7 +442,7 @@ class Pokemon:
 
         # STATUS CHECKS
         if self._status == PokemonStatus.FREEZE:
-            if random.random() < 0.2:
+            if random_source.random() < 0.2:
                 self._status = PokemonStatus.HEALTHY
                 msgs.append(Message(f"{self.surname} thawed out!"))
             else:
@@ -451,7 +458,7 @@ class Pokemon:
                 return False, msgs
 
         elif self._status == PokemonStatus.PARALYSIS:
-            if random.random() < 0.25:
+            if random_source.random() < 0.25:
                 return False, [Message(f"{self.surname} is paralyzed! It can't move!")]
 
         # VOLATILE CHECKS
@@ -461,7 +468,7 @@ class Pokemon:
             if self._confused_turns <= 0:
                 self._confused = False
                 msgs.append(Message(f"{self.surname} snapped out of confusion!"))
-            elif random.random() < 0.50:
+            elif random_source.random() < 0.50:
                 atk = self.attack
                 defn = self.defense
                 dmg = int(((self._level_factor * 40 * atk // defn) // 50) + 2)

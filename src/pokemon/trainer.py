@@ -24,7 +24,9 @@ class Trainer:
         "name",
         "pokemon_team",
         "_inventory_quantities",
-        "_initial_inventory_quantities",  # Added
+        "_initial_inventory_quantities",
+        "_possessed_item_ids",
+        "_initial_possessed_item_ids",
     )
 
     def __init__(
@@ -52,6 +54,10 @@ class Trainer:
                 if 0 <= item.id < max_item_id:
                     self._inventory_quantities[item.id] = quantity
         self._initial_inventory_quantities = self._inventory_quantities.copy()
+        self._possessed_item_ids = [
+            i for i, qty in enumerate(self._inventory_quantities) if qty > 0
+        ]
+        self._initial_possessed_item_ids = self._possessed_item_ids.copy()
 
     def get_item_quantity(self, item: Item) -> int:
         """Efficiently gets the quantity of a given item."""
@@ -66,9 +72,8 @@ class Trainer:
         Useful for generating valid action spaces in RL.
         """
         return [
-            (ItemRegistry.get(i), qty)
-            for i, qty in enumerate(self._inventory_quantities)
-            if qty > 0
+            (ItemRegistry.get(i), self._inventory_quantities[i])
+            for i in self._possessed_item_ids
         ]
 
     def decrease_item_quantity(self, item: Item):
@@ -76,6 +81,8 @@ class Trainer:
         if self._inventory_quantities[item.id] <= 0:
             raise TrainerError(f"No {item.name} left to use.")
         self._inventory_quantities[item.id] -= 1
+        if self._inventory_quantities[item.id] == 0:
+            self._possessed_item_ids.remove(item.id)
 
     def copy(self) -> Trainer:
         """
@@ -90,6 +97,10 @@ class Trainer:
         new_trainer._inventory_quantities = self._inventory_quantities.copy()
         new_trainer._initial_inventory_quantities = (
             self._initial_inventory_quantities.copy()
+        )
+        new_trainer._possessed_item_ids = self._possessed_item_ids.copy()
+        new_trainer._initial_possessed_item_ids = (
+            self._initial_possessed_item_ids.copy()
         )
 
         return new_trainer
@@ -140,6 +151,7 @@ class Trainer:
         for p in self.pokemon_team:
             p.reset()
         self._inventory_quantities = self._initial_inventory_quantities.copy()
+        self._possessed_item_ids = self._initial_possessed_item_ids.copy()
 
     def __repr__(self) -> str:
         return f"Trainer(name={self.name}, pokemons={self.pokemon_team})"

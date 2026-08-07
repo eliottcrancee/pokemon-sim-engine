@@ -45,9 +45,19 @@ class PokemonType(IntEnum):
 
         Complexity: O(1)
         """
+        if len(defenders) == 0:
+            return 1.0
         if len(defenders) == 1:
             return _EFFECTIVENESS_CHART[self][defenders[0]]
-        return _EFFECTIVENESS_CHART_3D[self][defenders[0]][defenders[1]]
+        if len(defenders) == 2:
+            return _EFFECTIVENESS_CHART_3D[self][defenders[0]][defenders[1]]
+        # Fall back to a sequential product rather than crashing. No species
+        # currently has more than two types, but a defensive guard keeps the
+        # battle engine robust against malformed species definitions.
+        multiplier = 1.0
+        for defender in defenders:
+            multiplier *= _EFFECTIVENESS_CHART[self][defender]
+        return multiplier
 
     @property
     def label(self) -> str:

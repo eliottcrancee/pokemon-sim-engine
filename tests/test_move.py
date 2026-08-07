@@ -230,3 +230,131 @@ def test_calculation_miss_logic():
         acc_stage=0,
     )
     assert damage == 0
+
+
+def test_pure_status_move_accuracy_rolls(chimchar: Pokemon, piplup: Pokemon):
+    """
+    Regression test: pure status moves (power == 0) must honor their listed
+    accuracy (e.g. Sleep Powder is 75%, not 100%).
+    """
+    sleep_powder = MoveRegistry.get("Sleep Powder")
+    assert sleep_powder is not None
+    assert sleep_powder.power == 0
+    assert sleep_powder.accuracy == 75
+
+    rng = random.Random(42)
+    sleeps = 0
+    for _ in range(1000):
+        piplup.status = PokemonStatus.HEALTHY
+        _, bd, crit, stab, eff = sleep_powder.calculate_damage(
+            chimchar, piplup, rng=rng
+        )
+        sleep_powder.secondary_effect(
+            chimchar, piplup, 0, bd, crit, stab, eff, rng=rng
+        )
+        if piplup.status == PokemonStatus.SLEEP:
+            sleeps += 1
+
+    # ~750/1000; wide tolerance to avoid flakes.
+    assert 650 <= sleeps <= 850
+
+
+def test_status_move_accuracy_scaled_by_user_stage(chimchar: Pokemon, piplup: Pokemon):
+    """
+    Regression test: a Pokemon whose accuracy was lowered (e.g. by Sand Attack)
+    should miss pure status moves more often.
+    """
+    sleep_powder = MoveRegistry.get("Sleep Powder")
+    chimchar.apply_accuracy_modifier(-2)  # 0.6x multiplier
+
+    rng = random.Random(42)
+    sleeps = 0
+    for _ in range(1000):
+        piplup.status = PokemonStatus.HEALTHY
+        _, bd, crit, stab, eff = sleep_powder.calculate_damage(
+            chimchar, piplup, rng=rng
+        )
+        sleep_powder.secondary_effect(
+            chimchar, piplup, 0, bd, crit, stab, eff, rng=rng
+        )
+        if piplup.status == PokemonStatus.SLEEP:
+            sleeps += 1
+
+    # 75% * 0.6 = 45%; wide tolerance.
+    assert 350 <= sleeps <= 550
+
+
+def test_always_hits_move_ignores_accuracy_stage(chimchar: Pokemon, piplup: Pokemon):
+    """
+    Regression test: Aura Sphere (always_hits=True) never misses, even when
+    the user's accuracy is at -6.
+    """
+    aura_sphere = MoveRegistry.get("Aura Sphere")
+    assert aura_sphere is not None
+    assert aura_sphere.always_hits is True
+
+    chimchar.apply_accuracy_modifier(-6)  # 0.33x multiplier
+    rng = random.Random(1)
+    damage, _, _, _, _ = aura_sphere.calculate_damage(chimchar, piplup, rng=rng)
+    assert damage > 0
+
+
+def test_mud_slap_lowers_accuracy_stage(chimchar: Pokemon, piplup: Pokemon):
+    """
+    Regression test: Mud-Slap applies an accuracy stage drop to the target.
+    """
+    mud_slap = MoveRegistry.get("Mud-Slap")
+    assert mud_slap is not None
+    assert mud_slap.accuracy_stages == -1
+
+    msgs = mud_slap.secondary_effect(
+        chimchar, piplup, 9, 9, False, False, 1.0, rng=random.Random(1)
+    )
+    assert piplup._accuracy_stage == -1
+    assert "fell" in msgs[0].text
+
+
+def test_stat_move_debuff_misses_with_low_accuracy(chimchar: Pokemon, piplup: Pokemon):
+    """
+    Regression test: a non-self-targeting stat move with a low accuracy (e.g.
+    70%) should miss when the accuracy roll fails, not always apply.
+    """
+    from pokemon.move import StatMove
+
+    low_acc_stat = StatMove(
+        "TestStatDebuff",
+        PokemonType.GROUND,
+        15,
+        "speed",  # stat to lower
+        -1,
+        self_target=False,
+        accuracy=70,  # 70% accuracy so it can miss
+    )
+
+    # Patch random to force a miss (0.9 > 0.70).
+    with patch("random.random", return_value=0.9):
+        msgs = low_acc_stat.secondary_effect(
+            chimchar, piplup, 0, 0, False, False, 1.0
+        )
+    assert "missed" in msgs[0].text
+    assert piplup.modifiers[4] == 0  # No stat change applied
+
+    # And a hit applies it.
+    with patch("random.random", return_value=0.1):
+        msgs = low_acc_stat.secondary_effect(
+            chimchar, piplup, 0, 0, False, False, 1.0
+        )
+    assert "missed" not in msgs[0].text
+    assert piplup.modifiers[4] == -1
+
+
+def test_effectiveness_with_three_types():
+    """
+    Regression test: type effectiveness must not crash when a defender has
+    more than two types (the old chart lookup raised IndexError).
+    """
+    # A synthetic 3-type defender (no Fire, so Fire deals 2x * 2x * 1x).
+    result = PokemonType.FIRE.effectiveness_against(
+        (PokemonType.GRASS, PokemonType.BUG, PokemonType.ELECTRIC)
+    )
+    assert result == 4.0  # 2x * 2x * 1x

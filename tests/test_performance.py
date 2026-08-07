@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import time
+import random
+
+import pytest
 
 from joblib import Parallel, cpu_count, delayed
 
 from pokemon import config as pokemon_config
 from pokemon.agents import FirstAgent
+from pokemon.agents.search import AlphaBetaAgent, MinimaxAgent
 from pokemon.battle import Battle
 from pokemon.battle_registry import BattleRegistry
 
@@ -29,6 +33,38 @@ def test_performance_battle_turns(benchmark):
         battle.turn(action_0, action_1)
 
     benchmark(run_turn)
+
+
+@pytest.mark.parametrize("use_cache", [False, True])
+def test_benchmark_minimax_cache(benchmark, use_cache: bool):
+    """Benchmarks Minimax action selection with and without transposition cache."""
+    battle = BattleRegistry.get(BASELINE_BATTLE)
+    if battle is None:
+        raise AssertionError(f"BattleRegistry scenario '{BASELINE_BATTLE}' not found")
+
+    agent = MinimaxAgent(depth=2, use_cache=use_cache, parallelize=False)
+
+    def run_get_action() -> None:
+        random.seed(12345)
+        agent.get_action(battle.copy(), trainer_id=0, verbose=False)
+
+    benchmark(run_get_action)
+
+
+@pytest.mark.parametrize("use_cache", [False, True])
+def test_benchmark_alphabeta_cache(benchmark, use_cache: bool):
+    """Benchmarks Alpha-Beta action selection with and without transposition cache."""
+    battle = BattleRegistry.get(BASELINE_BATTLE)
+    if battle is None:
+        raise AssertionError(f"BattleRegistry scenario '{BASELINE_BATTLE}' not found")
+
+    agent = AlphaBetaAgent(depth=2, use_cache=use_cache, parallelize=False)
+
+    def run_get_action() -> None:
+        random.seed(12345)
+        agent.get_action(battle.copy(), trainer_id=0, verbose=False)
+
+    benchmark(run_get_action)
 
 
 def battle_worker(duration: int, battle: Battle | None = None) -> int:

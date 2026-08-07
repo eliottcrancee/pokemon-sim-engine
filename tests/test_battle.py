@@ -270,7 +270,19 @@ def test_after_turn_damage_happens_after_actions():
     attacker.hp = 1
     initial_defender_hp = defender.hp
 
-    battle.turn(Action.create_attack(0), Action.create_pass())
+    damaging_actions = [
+        action
+        for action in battle.get_possible_actions(0)
+        if action.action_type == ActionType.ATTACK
+        and action.attack_move_slot_index >= 0
+        and attacker.move_slots[action.attack_move_slot_index].move.power > 0
+    ]
+    assert damaging_actions, "Expected at least one damaging action"
+
+    attack_action = damaging_actions[0]
+    attacker.move_slots[attack_action.attack_move_slot_index].move.accuracy = 100
+
+    battle.turn(attack_action, Action.create_pass())
 
     assert defender.hp < initial_defender_hp
     assert attacker.is_alive is False

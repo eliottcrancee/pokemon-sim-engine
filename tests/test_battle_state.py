@@ -48,6 +48,15 @@ def test_battle_inequality_on_round_change():
     assert hash(b1) != hash(b2)
 
 
+def test_battle_inequality_on_max_rounds_change() -> None:
+    b1 = create_test_battle()
+    b2 = create_test_battle()
+    b2.max_rounds = b1.max_rounds + 1
+
+    assert b1 != b2
+    assert hash(b1) != hash(b2)
+
+
 def test_battle_inequality_on_hp_change():
     """Tests that battles are not equal if a Pokemon's HP differs."""
     b1 = create_test_battle()
@@ -115,6 +124,45 @@ def test_battle_hashing_in_set():
 
     state_set.add(b3)
     assert len(state_set) == 2
+
+
+def test_battle_inequality_on_terminal_flags_change() -> None:
+    b1 = create_test_battle()
+    b2 = create_test_battle()
+    b2.tie = True
+
+    assert b1 != b2
+    assert hash(b1) != hash(b2)
+
+
+def test_battle_seed_does_not_affect_hash_or_equality() -> None:
+    b1 = create_test_battle()
+    b2 = create_test_battle()
+
+    b1.reseed(123)
+    b2.reseed(456)
+
+    assert b1 == b2
+    assert hash(b1) == hash(b2)
+
+
+def test_battle_reset_reseed_changes_seed() -> None:
+    battle = create_test_battle()
+    old_seed = battle.seed
+
+    battle.reset(reseed=True)
+
+    assert battle.seed != old_seed
+
+
+def test_battle_reset_without_reseed_keeps_seed() -> None:
+    battle = create_test_battle()
+    fixed_seed = 42
+    battle.reseed(fixed_seed)
+
+    battle.reset(reseed=False)
+
+    assert battle.seed == fixed_seed
 
 
 _VALID_TRAINER_DEF = {

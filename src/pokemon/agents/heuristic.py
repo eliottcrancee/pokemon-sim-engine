@@ -13,6 +13,8 @@ from .base_agent import BaseAgent
 class RandomAttackAndPotionAgent(BaseAgent):
     """Agent that randomly attacks, but uses a potion if HP is low."""
 
+    DEFAULT_SWEEP_PARAMS = {"heal_threshold": [0.1, 0.2, 0.3]}
+
     def __init__(
         self, name: str = "RandomAttackAndPotion", heal_threshold: float = 0.2
     ):
@@ -81,6 +83,8 @@ class BestAttackAgent(BaseAgent):
 class BestAttackAndPotionAgent(BaseAgent):
     """Agent that uses the best attack, but uses a potion if HP is low."""
 
+    DEFAULT_SWEEP_PARAMS = {"heal_threshold": [0.1, 0.2, 0.3]}
+
     def __init__(self, name: str = "BestAttackAndPotion", heal_threshold: float = 0.2):
         """Initialize the agent."""
         name = f"{name}(heal_t={heal_threshold})"
@@ -130,6 +134,11 @@ class SmarterHeuristicAgent(BaseAgent):
     - Scores switching based on type advantages and disadvantages.
     - Scores healing items based on HP restored and avoiding waste.
     """
+
+    DEFAULT_SWEEP_PARAMS = {
+        "heal_threshold": [0.2, 0.3, 0.4],
+        "switch_hp_threshold": [0.3, 0.4, 0.5],
+    }
 
     def __init__(
         self,

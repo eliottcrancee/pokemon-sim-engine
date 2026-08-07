@@ -10,7 +10,11 @@ from pokemon.loguru_logger import logger
 
 
 def play(
-    battle: Battle, agent_0: BaseAgent, agent_1: BaseAgent, verbose=False
+    battle: Battle,
+    agent_0: BaseAgent,
+    agent_1: BaseAgent,
+    verbose=False,
+    reseed_each_battle: bool = False,
 ) -> float:
     """Main game loop."""
 
@@ -20,7 +24,7 @@ def play(
     if verbose:
         logger.info(f"Starting a new battle between {agent_0.name} and {agent_1.name}")
 
-    battle.reset()
+    battle.reset(reseed=reseed_each_battle)
     while not battle.done:
         action_0 = agent_0.get_action(battle, 0, verbose=verbose)
         action_1 = agent_1.get_action(battle, 1, verbose=verbose)
@@ -46,6 +50,7 @@ def play_multiple(
     n_battles=1,
     n_jobs=-1,
     verbose=False,
+    reseed_each_battle: bool = False,
 ) -> tuple[int, int, int]:
     """Play multiple battles in parallel using joblib."""
 
@@ -56,7 +61,13 @@ def play_multiple(
         n_jobs = cpu_count()
 
     def _run():
-        return play(battle.copy(), agent_0, agent_1)
+        return play(
+            battle.copy(),
+            agent_0,
+            agent_1,
+            verbose=False,
+            reseed_each_battle=reseed_each_battle,
+        )
 
     parallel_gen = Parallel(n_jobs=n_jobs, prefer="processes", return_as="generator")(
         delayed(_run)() for _ in range(n_battles)
@@ -81,6 +92,7 @@ def play_tournament(
     battle: Battle,
     n_matches: int,
     n_battles_per_match: int,
+    reseed_each_battle: bool = False,
 ) -> list[BaseAgent]:
     for _ in tqdm(range(n_matches), desc="Glicko-2 Tournament"):
         agent0, agent1 = random.sample(agent_pool, 2)
@@ -92,6 +104,7 @@ def play_tournament(
             n_battles=n_battles_per_match,
             n_jobs=-1,
             verbose=False,
+            reseed_each_battle=reseed_each_battle,
         )
 
         # Normalized scores (Glicko-2 expects a score per game, but we batch them)

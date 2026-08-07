@@ -8,7 +8,7 @@ def main():
     print("--- Quick Start UI Battle ---")
 
     # Load a battle from the registry
-    battle_name = "kanto_classic"
+    battle_name = "sinnoh_opening_sparks"
     battle = BattleRegistry.get(battle_name)
     
     if not battle:

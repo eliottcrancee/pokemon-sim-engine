@@ -155,50 +155,50 @@ BattleRegistry.register(
     },
 )
 
-# Midgame tactical battle with hazards-like pressure, pivoting and speed control.
+# Early-game tactical battle with simple pivoting and status pressure.
 BattleRegistry.register(
     "midgame_pivot_pressure",
     trainer1_def={
         "name": "Ace Trainer Maylene",
         "team": [
             {
-                "species": "Hippopotas",
-                "level": 42,
-                "moves": ["Sand Attack", "Body Slam", "Bite", "Tackle"],
+                "species": "Shinx",
+                "level": 14,
+                "moves": ["Tackle", "Bite", "Thunder Wave", "Quick Attack"],
             },
             {
-                "species": "Luxray",
-                "level": 42,
-                "moves": ["Wild Charge", "Bite", "Thunderbolt", "Body Slam"],
+                "species": "Starly",
+                "level": 13,
+                "moves": ["Tackle", "Quick Attack", "Wing Attack", "Growl"],
             },
             {
-                "species": "Staraptor",
-                "level": 42,
-                "moves": ["U-turn", "Brave Bird", "Quick Attack", "Take Down"],
+                "species": "Piplup",
+                "level": 13,
+                "moves": ["Pound", "Growl", "Bubble", "Water Gun"],
             },
         ],
-        "inventory": {"Super Potion": 2},
+        "inventory": {"Potion": 2},
     },
     trainer2_def={
         "name": "Ace Trainer Volkner",
         "team": [
             {
-                "species": "Magnezone",
-                "level": 42,
-                "moves": ["Thunderbolt", "Flash Cannon", "Tri Attack", "Thunder Shock"],
+                "species": "Turtwig",
+                "level": 14,
+                "moves": ["Tackle", "Withdraw", "Absorb", "Razor Leaf"],
             },
             {
-                "species": "Garchomp",
-                "level": 42,
-                "moves": ["Dragon Rush", "Earthquake", "Crunch", "Sand Attack"],
+                "species": "Starly",
+                "level": 13,
+                "moves": ["Tackle", "Quick Attack", "Wing Attack", "Growl"],
             },
             {
-                "species": "Togekiss",
-                "level": 42,
-                "moves": ["Air Slash", "Nasty Plot", "Aura Sphere", "Thunder Wave"],
+                "species": "Shinx",
+                "level": 13,
+                "moves": ["Tackle", "Bite", "Thunder Wave", "Quick Attack"],
             },
         ],
-        "inventory": {"Super Potion": 2},
+        "inventory": {"Potion": 2},
     },
 )
 
