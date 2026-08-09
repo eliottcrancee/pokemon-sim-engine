@@ -152,9 +152,9 @@ def parallel_stress_test_turns(duration: int = 20) -> None:
     print(f"Using {num_process} CPU cores...")
 
     start_time = time.perf_counter()
-    results = Parallel(n_jobs=num_process)(
-        delayed(battle_worker)(duration) for _ in range(num_process)
-    )
+    results = Parallel(
+        n_jobs=num_process,
+    )(delayed(battle_worker)(duration) for _ in range(num_process))
     end_time = time.perf_counter()
 
     total_turns = sum(r for r in results if isinstance(r, int))
@@ -165,5 +165,4 @@ def parallel_stress_test_turns(duration: int = 20) -> None:
 
 
 if __name__ == "__main__":
-    # battle_worker_timed(1000, battle_generator())
     parallel_stress_test_turns()

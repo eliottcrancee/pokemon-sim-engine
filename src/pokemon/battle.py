@@ -10,14 +10,14 @@ from pokemon.trainer import Trainer
 
 class Battle:
     __slots__ = (
-        "trainers",
+        "_rng",
+        "headless",
         "max_rounds",
         "round",
-        "winner",
-        "tie",
-        "headless",
         "seed",
-        "_rng",
+        "tie",
+        "trainers",
+        "winner",
     )
 
     def __init__(
@@ -153,6 +153,16 @@ class Battle:
         user = trainer.active_pokemon
         target = opponent.active_pokemon
 
+        # If the user fainted before this move could be executed
+        if not user.is_alive:
+            if self.headless:
+                return []
+            return [
+                Message(
+                    f"{trainer.name}'s {user.surname} can't move because it fainted!"
+                )
+            ]
+
         # If the target fainted before this move could be executed
         if not target.is_alive:
             if self.headless:
@@ -170,20 +180,25 @@ class Battle:
             move = user.move_slots[move_slot_index].move
             user.decrease_pp(move_slot_index)
 
+        can_attack, new_messages = user.can_attack(rng=self._rng)
+
         if self.headless:
             messages = []
         else:
-            messages = [Message(f"{trainer.name}'s {user.surname} uses {move.name}!")]
-
-        can_attack, new_messages = user.can_attack(rng=self._rng)
-        if not self.headless:
+            messages = []
+            if can_attack:
+                messages.append(
+                    Message(f"{trainer.name}'s {user.surname} uses {move.name}!")
+                )
             messages.extend(new_messages)
 
         if can_attack:
             damage, base_damage, critical, stab, effectiveness = move.calculate_damage(
                 user, target, rng=self._rng
             )
+            hp_before = target.hp
             target.hp -= damage
+            actual_damage = hp_before - target.hp
             if not self.headless:
                 if effectiveness == 0:
                     messages.append(Message("It doesn't affect the target..."))
@@ -195,7 +210,9 @@ class Battle:
 
                     if critical:
                         messages.append(Message("Critical hit!"))
-                    messages.append(Message(f"{target.surname} lost {damage} HP."))
+                    messages.append(
+                        Message(f"{target.surname} lost {actual_damage} HP.")
+                    )
                 elif move.category != MoveCategory.STATUS:
                     messages.append(Message(f"{user.surname}'s attack missed!"))
             messages.extend(

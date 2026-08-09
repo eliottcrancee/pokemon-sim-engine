@@ -21,7 +21,7 @@ init(autoreset=True)
 # Constants for UI
 BATTLE_SCREEN_WIDTH = 80
 BATTLE_SCREEN_HEIGHT = 30
-MESSAGE_BOX_HEIGHT = 8
+MESSAGE_BOX_HEIGHT = 12
 TEXT_DELAY = 0.01  # Seconds between characters for the typewriter effect
 
 # Colors
@@ -153,6 +153,41 @@ def get_hp_color(current_hp: int, max_hp: int) -> str:
         return COLOR_HP_LOW
 
 
+STATUS_LABELS: dict[PokemonStatus, str] = {
+    PokemonStatus.BURN: "Burned",
+    PokemonStatus.FREEZE: "Frozen",
+    PokemonStatus.PARALYSIS: "Paralyzed",
+    PokemonStatus.POISON: "Poisoned",
+    PokemonStatus.SLEEP: "Asleep",
+    PokemonStatus.FAINTED: "Fainted",
+}
+
+STATUS_COLORS: dict[PokemonStatus, str] = {
+    PokemonStatus.BURN: str(Fore.RED),
+    PokemonStatus.FREEZE: str(Fore.CYAN),
+    PokemonStatus.PARALYSIS: str(Fore.YELLOW),
+    PokemonStatus.POISON: str(Fore.MAGENTA),
+    PokemonStatus.SLEEP: str(Fore.BLUE) + str(Style.BRIGHT),
+    PokemonStatus.FAINTED: str(Fore.LIGHTBLACK_EX),
+}
+
+
+def format_status_conditions(pokemon: Pokemon) -> str:
+    """Builds a colored, human-readable status string for a Pokemon."""
+    conditions: list[str] = []
+    if pokemon.status != PokemonStatus.HEALTHY:
+        label = STATUS_LABELS.get(pokemon.status, str(pokemon.status.name))
+        color = STATUS_COLORS.get(pokemon.status, COLOR_WARNING)
+        conditions.append(f"{color}{label}{COLOR_RESET}")
+    if pokemon.confused:
+        conditions.append(f"{COLOR_WARNING}Confused{COLOR_RESET}")
+    if pokemon.taunted:
+        conditions.append(f"{COLOR_WARNING}Taunted{COLOR_RESET}")
+    if not conditions:
+        return f"Status: {COLOR_HP_HIGH}None{COLOR_RESET}"
+    return "Status: " + ", ".join(conditions)
+
+
 def display_pokemon_stats(pokemon: Pokemon, is_opponent: bool = False) -> list[str]:
     lines = []
     name_line = (
@@ -181,19 +216,7 @@ def display_pokemon_stats(pokemon: Pokemon, is_opponent: bool = False) -> list[s
 
     hp_line = f"HP: {hp_bar} {current_hp}/{max_hp}"
 
-    status_conditions = []
-    if pokemon.status != PokemonStatus.HEALTHY:
-        status_conditions.append(str(pokemon.status.name))
-    if pokemon.confused:
-        status_conditions.append("Confused")
-    if pokemon.taunted:
-        status_conditions.append("Taunted")
-
-    status_line = "Status: "
-    if status_conditions:
-        status_line += ", ".join(status_conditions)
-    else:
-        status_line += "None"
+    status_line = format_status_conditions(pokemon)
 
     if is_opponent:
         lines.append(name_line)

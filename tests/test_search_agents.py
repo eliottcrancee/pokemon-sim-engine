@@ -31,13 +31,17 @@ def battle():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("cls", [MonteCarloExpectiminimaxAgent, RiskAwareExpectimaxAgent])
+@pytest.mark.parametrize(
+    "cls", [MonteCarloExpectiminimaxAgent, RiskAwareExpectimaxAgent]
+)
 def test_mc_agents_reject_depth_zero(cls):
     with pytest.raises(ValueError):
         cls(depth=0)
 
 
-@pytest.mark.parametrize("cls", [MonteCarloExpectiminimaxAgent, RiskAwareExpectimaxAgent])
+@pytest.mark.parametrize(
+    "cls", [MonteCarloExpectiminimaxAgent, RiskAwareExpectimaxAgent]
+)
 def test_mc_agents_reject_zero_simulations(cls):
     with pytest.raises(ValueError):
         cls(num_simulations=0)

@@ -69,7 +69,7 @@ def play_multiple(
             reseed_each_battle=reseed_each_battle,
         )
 
-    parallel_gen = Parallel(n_jobs=n_jobs, prefer="processes", return_as="generator")(
+    parallel_gen = Parallel(n_jobs=n_jobs, return_as="generator")(
         delayed(_run)() for _ in range(n_battles)
     )
 

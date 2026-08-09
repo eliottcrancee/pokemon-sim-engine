@@ -315,6 +315,37 @@ def test_turn_skips_second_action_when_first_action_ends_battle(_mock_random):
     assert battle.trainers[0].active_pokemon.hp == initial_fast_hp
 
 
+def test_fainted_pokemon_cannot_attack_after_priority_ko():
+    """A Pokemon that faints to a priority move must not execute a later move."""
+    starly_a = Pokemon(species=Pokedex.Starly, level=50)
+    starly_b = Pokemon(species=Pokedex.Starly, level=5)
+    starly_b.hp = 1
+
+    trainer_a = Trainer(name="Volkner", pokemon_team=[starly_a])
+    trainer_b = Trainer(name="Maylene", pokemon_team=[starly_b])
+    battle = Battle((trainer_a, trainer_b), headless=False)
+
+    # Volkner attacks first with a strong priority move (Quick Attack),
+    # and Maylene attacks with a regular move that goes second.
+    volkner_action = Action.create_attack(0)
+    maylene_action = Action.create_attack(0)
+
+    # Make Quick Attack strong enough to one-shot Starly B, and guarantee it's first.
+    battle.trainers[0].active_pokemon.move_slots[0].move.power = 150
+    battle.trainers[0].active_pokemon.move_slots[0].move.priority = 1
+
+    initial_volkner_hp = battle.trainers[0].active_pokemon.hp
+    messages = battle.turn(volkner_action, maylene_action)
+
+    text = "\n".join(m.text for m in messages)
+
+    # Maylene's Starly fainted to the priority move and must not attack back.
+    assert not battle.trainers[1].active_pokemon.is_alive
+    assert any("fainted" in m.text for m in messages)
+    assert "lost 11 HP" not in text
+    assert battle.trainers[0].active_pokemon.hp == initial_volkner_hp
+
+
 def test_battle_custom_copy_performance(benchmark, battle_instance):
     """Benchmarks the custom copy method."""
     custom_copied_battle = benchmark(battle_instance.copy)

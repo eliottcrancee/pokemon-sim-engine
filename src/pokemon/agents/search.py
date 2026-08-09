@@ -17,7 +17,47 @@ from pokemon.loguru_logger import logger
 from .base_agent import BaseAgent
 
 
-class OneStepUniformExpectimaxAgent(BaseAgent):
+class _ParallelPoolMixin:
+    """Reusable joblib pool shared across turns to avoid re-spawning workers.
+
+    Spawning a loky process pool on Windows is expensive (~1s). Reusing a
+    single pool for the whole lifetime of the agent amortises that cost and
+    guarantees the CPU is saturated from the very first ``get_action`` call.
+    The pool lives on the instance but is excluded from pickling
+    (``__getstate__``/``__setstate__``) so parallel workers can still receive
+    a copy of the agent without trying to serialize the pool itself.
+    """
+
+    _parallel_pool: Parallel | None = None
+    # Every subclass sets this in __init__; declared here for static typing.
+    parallelize: bool = False
+
+    # Jobs below this threshold have so little work that the overhead of
+    # spawning/communicating with parallel workers dwarfs any speedup, so we
+    # fall back to sequential execution (measurements: task count * depth).
+    PARALLEL_MIN_JOBS: ClassVar[int] = 16
+
+    def _get_pool(self) -> Parallel:
+        if self._parallel_pool is None:
+            self._parallel_pool = Parallel(n_jobs=-1)
+        return self._parallel_pool
+
+    def _should_parallelize(self, task_count: int) -> bool:
+        """Return whether parallelizing ``task_count`` jobs is worth it."""
+        return self.parallelize and task_count >= self.PARALLEL_MIN_JOBS
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # The pool is not picklable and must not travel to the workers.
+        state["_parallel_pool"] = None
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._parallel_pool = None
+
+
+class OneStepUniformExpectimaxAgent(_ParallelPoolMixin, BaseAgent):
     """Agent that evaluates actions by simulating one turn ahead.
     Uses a heuristic to score the resulting battle state after one turn.
     The action with the highest average score against all opponent responses
@@ -92,14 +132,24 @@ class OneStepUniformExpectimaxAgent(BaseAgent):
                 f"{len(op_actions)} opponent actions."
             )
 
-        if self.parallelize:
-            results = Parallel(n_jobs=-1)(
+        if self._should_parallelize(len(my_actions) * len(op_actions)):
+            if not op_actions:
+                return my_actions[0]
+            # Flatten over (my_action x op_action) pairs so joblib can spawn
+            # far more tasks than the number of our own actions and saturate
+            # all CPU cores. Each task scores one single action pair.
+            results = self._get_pool()(
                 delayed(self._calculate_action_score)(
-                    battle, trainer_id, a0, op_actions, verbose
+                    battle, trainer_id, a0, [a1], verbose
                 )
                 for a0 in my_actions
+                for a1 in op_actions
             )
-            avg_scores = np.array(results)
+            avg_scores = (
+                np.asarray(results)
+                .reshape(len(my_actions), len(op_actions))
+                .mean(axis=1)
+            )
         else:
             avg_scores = np.zeros(len(my_actions))
             for i, a0 in enumerate(my_actions):
@@ -111,7 +161,7 @@ class OneStepUniformExpectimaxAgent(BaseAgent):
         return my_actions[best_index]
 
 
-class MinimaxAgent(BaseAgent):
+class MinimaxAgent(_ParallelPoolMixin, BaseAgent):
     """Minimax agent for Pokemon battles."""
 
     DEFAULT_SWEEP_PARAMS: ClassVar[dict[str, list[int]]] = {"depth": [1, 2, 3]}
@@ -134,6 +184,17 @@ class MinimaxAgent(BaseAgent):
         self.depth = depth
         self.parallelize = parallelize
         self.evaluation_func = evaluation_func or standard_evaluation
+
+    def _apply_turn(
+        self, battle: Battle, trainer_id: int, a0: Action, a1: Action
+    ) -> Battle:
+        """Return a copy of the battle advanced by one turn."""
+        sim_battle = battle.copy()
+        if trainer_id == 0:
+            sim_battle.turn(a0, a1)
+        else:
+            sim_battle.turn(a1, a0)
+        return sim_battle
 
     def _evaluate_minimax_action(
         self,
@@ -214,16 +275,30 @@ class MinimaxAgent(BaseAgent):
             )
 
         if self.parallelize:
-            scores = cast(
+            if not op_actions:
+                return my_actions[0]
+            # Parallelize over (my_action x op_action) pairs instead of just
+            # my_actions so there are enough tasks to use every CPU core.
+            # Each delayed call evaluates a single opponent reply -> a child
+            # node; we take the min across replies per move.
+            pair_scores = cast(
                 list[float],
-                Parallel(n_jobs=-1)(
-                    delayed(self._evaluate_minimax_action)(
-                        battle, trainer_id, a0, op_actions, verbose
+                self._get_pool()(
+                    delayed(self._minimax)(
+                        self._apply_turn(battle, trainer_id, a0, a1),
+                        trainer_id,
+                        self.depth - 1,
                     )
                     for a0 in my_actions
+                    for a1 in op_actions
                 ),
             )
-            best_action_index = max(range(len(scores)), key=lambda idx: scores[idx])
+            scores = (
+                np.asarray(pair_scores)
+                .reshape(len(my_actions), len(op_actions))
+                .min(axis=1)
+            )
+            best_action_index = int(np.argmax(scores))
             return my_actions[best_action_index]
         else:
             best_score = -float("inf")
@@ -244,7 +319,7 @@ class MinimaxAgent(BaseAgent):
         return f"{self.__class__.__name__}(name='{self.name}', depth={self.depth})"
 
 
-class AlphaBetaAgent(BaseAgent):
+class AlphaBetaAgent(_ParallelPoolMixin, BaseAgent):
     """Minimax agent with Alpha-Beta pruning for Pokemon battles."""
 
     DEFAULT_SWEEP_PARAMS: ClassVar[dict[str, list[int]]] = {"depth": [1, 2, 3]}
@@ -267,6 +342,17 @@ class AlphaBetaAgent(BaseAgent):
         self.depth = depth
         self.parallelize = parallelize
         self.evaluation_func = evaluation_func or standard_evaluation
+
+    def _apply_turn(
+        self, battle: Battle, trainer_id: int, a0: Action, a1: Action
+    ) -> Battle:
+        """Return a copy of the battle advanced by one turn."""
+        sim_battle = battle.copy()
+        if trainer_id == 0:
+            sim_battle.turn(a0, a1)
+        else:
+            sim_battle.turn(a1, a0)
+        return sim_battle
 
     def _evaluate_alphabeta_action(
         self,
@@ -351,22 +437,61 @@ class AlphaBetaAgent(BaseAgent):
             )
 
         if self.parallelize:
-            scores = cast(
+            if not my_actions:
+                raise ValueError("No possible actions for agent.")
+
+            # Young Brothers Wait Concept (YBWC): search the first child
+            # sequentially to obtain a tight alpha bound, then evaluate the
+            # remaining siblings in parallel using that bound. Sharing the
+            # alpha bound preserves pruning (unlike a naive flatten that
+            # restarts each task from [-inf, inf] and re-explores pruned
+            # branches), which is what makes parallel alpha-beta actually
+            # FASTER than sequential.
+            op_actions = battle.get_possible_actions(1 - trainer_id)
+            if len(my_actions) == 1 or not op_actions:
+                return my_actions[
+                    int(
+                        np.argmax(
+                            [
+                                self._get_min_value(
+                                    battle,
+                                    a,
+                                    trainer_id,
+                                    self.depth,
+                                    -float("inf"),
+                                    float("inf"),
+                                )
+                                for a in my_actions
+                            ]
+                        )
+                    )
+                ]
+
+            first_action = my_actions[0]
+            alpha_bound = self._get_min_value(
+                battle,
+                first_action,
+                trainer_id,
+                self.depth,
+                -float("inf"),
+                float("inf"),
+            )
+            sibling_scores = cast(
                 list[float],
-                Parallel(n_jobs=-1)(
-                    delayed(self._evaluate_alphabeta_action)(
+                self._get_pool()(
+                    delayed(self._get_min_value)(
                         battle,
                         action,
                         trainer_id,
                         self.depth,
-                        -float("inf"),
+                        alpha_bound,
                         float("inf"),
-                        verbose,
                     )
-                    for action in my_actions
+                    for action in my_actions[1:]
                 ),
             )
-            best_action_index = max(range(len(scores)), key=lambda idx: scores[idx])
+            scores = [alpha_bound, *sibling_scores]
+            best_action_index = int(np.argmax(scores))
             return my_actions[best_action_index]
         else:
             best_score = -float("inf")
@@ -394,7 +519,7 @@ class AlphaBetaAgent(BaseAgent):
         return f"{self.__class__.__name__}(name='{self.name}', depth={self.depth})"
 
 
-class MonteCarloExpectiminimaxAgent(BaseAgent):
+class MonteCarloExpectiminimaxAgent(_ParallelPoolMixin, BaseAgent):
     """
     An agent that handles the randomness of Pokemon battles by simulating
     the same turn multiple times (Monte Carlo sampling) to calculate an
@@ -467,9 +592,7 @@ class MonteCarloExpectiminimaxAgent(BaseAgent):
             if depth <= 1 or sim_battle.winner is not None:
                 total_score += self.evaluation_func(sim_battle, trainer_id)
             else:
-                total_score += self._expectimax_value(
-                    sim_battle, trainer_id, depth - 1
-                )
+                total_score += self._expectimax_value(sim_battle, trainer_id, depth - 1)
 
         return total_score / self.num_simulations
 
@@ -545,17 +668,27 @@ class MonteCarloExpectiminimaxAgent(BaseAgent):
 
         # --- Parallel Execution ---
         if self.parallelize:
-            # We parallelize the outer loop (My Actions)
-            scores = cast(
+            if not op_actions:
+                return my_actions[0]
+            # Flatten over (my_action, op_action) so there are far more tasks
+            # than my_actions alone; each task runs its own MC sampling for a
+            # single pair and we take the min across opponent replies.
+            pair_scores = cast(
                 list[float],
-                Parallel(n_jobs=-1)(
-                    delayed(self._evaluate_action_node)(
-                        battle, trainer_id, a0, op_actions, self.depth, verbose
+                self._get_pool()(
+                    delayed(self._simulate_outcome)(
+                        battle, trainer_id, a0, a1, self.depth
                     )
                     for a0 in my_actions
+                    for a1 in op_actions
                 ),
             )
-            best_index = max(range(len(scores)), key=lambda idx: scores[idx])
+            scores = (
+                np.asarray(pair_scores)
+                .reshape(len(my_actions), len(op_actions))
+                .min(axis=1)
+            )
+            best_index = int(np.argmax(scores))
             return my_actions[best_index]
 
         # --- Sequential Execution ---
@@ -582,7 +715,7 @@ class MonteCarloExpectiminimaxAgent(BaseAgent):
             return best_action
 
 
-class RiskAwareExpectimaxAgent(BaseAgent):
+class RiskAwareExpectimaxAgent(_ParallelPoolMixin, BaseAgent):
     """
     Expectimax agent that explicitly models turn randomness with Monte Carlo
     sampling and applies a risk penalty to unstable outcomes.
@@ -720,22 +853,24 @@ class RiskAwareExpectimaxAgent(BaseAgent):
             )
 
         if self.parallelize:
-            scores = cast(
+            if not op_actions:
+                return my_actions[0]
+            pair_scores = cast(
                 list[float],
-                Parallel(n_jobs=-1)(
-                    delayed(self._evaluate_action_node)(
-                        battle,
-                        trainer_id,
-                        action,
-                        op_actions,
-                        self.depth,
-                        verbose,
+                self._get_pool()(
+                    delayed(self._risk_adjusted_pair_value)(
+                        battle, trainer_id, action, op_action, self.depth
                     )
                     for action in my_actions
+                    for op_action in op_actions
                 ),
             )
-
-            best_index = max(range(len(scores)), key=lambda idx: scores[idx])
+            scores = (
+                np.asarray(pair_scores)
+                .reshape(len(my_actions), len(op_actions))
+                .mean(axis=1)
+            )
+            best_index = int(np.argmax(scores))
             return my_actions[best_index]
         else:
             best_score = -float("inf")

@@ -76,6 +76,11 @@ AGENT_CATALOG: list[AgentEntry] = [
         lambda: AlphaBetaAgent(depth=2),
     ),
     AgentEntry(
+        "alphabeta_d4_parallel",
+        "Alpha-Beta d=4 (parallel)",
+        lambda: AlphaBetaAgent(depth=4, parallelize=True),
+    ),
+    AgentEntry(
         "risk_expectimax",
         "Risk-Aware Expectimax",
         lambda: RiskAwareExpectimaxAgent(depth=1),
@@ -86,9 +91,14 @@ AGENT_CATALOG: list[AgentEntry] = [
         lambda: MonteCarloExpectiminimaxAgent(depth=1),
     ),
     AgentEntry(
-        "iterative_alphabeta",
-        "Iterative Deepening Alpha-Beta",
-        lambda: IterativeDeepeningAlphaBetaAgent(max_depth=3, time_limit=1.0),
+        "iterative_alphabeta_short",
+        "Iterative Deepening Alpha-Beta (short time limit)",
+        lambda: IterativeDeepeningAlphaBetaAgent(max_depth=5, time_limit=0.5),
+    ),
+    AgentEntry(
+        "iterative_alphabeta_long",
+        "Iterative Deepening Alpha-Beta (long time limit)",
+        lambda: IterativeDeepeningAlphaBetaAgent(max_depth=5, time_limit=2.0),
     ),
     AgentEntry("mcts", "MCTS", lambda: MCTSAgent(time_limit=1.0, rollout_depth=8)),
 ]
@@ -101,6 +111,8 @@ BASELINE_AGENT_KEYS: tuple[str, ...] = (
     "best_attack_potion",
     "smarter_heuristic",
     "uniform_expectimax",
+    "alphabeta_d2",
+    "risk_expectimax",
 )
 
 SWEEP_FAMILIES: list[type[BaseAgent]] = [
@@ -168,19 +180,6 @@ def _prompt_optional_int(prompt: str) -> int | None:
             return int(raw)
         except ValueError:
             print("Please enter a valid integer or empty.")
-
-
-def _prompt_yes_no(prompt: str, default: bool = True) -> bool:
-    default_text = "Y/n" if default else "y/N"
-    while True:
-        raw = _safe_input(f"{prompt} [{default_text}]: ").lower()
-        if not raw:
-            return default
-        if raw in {"y", "yes"}:
-            return True
-        if raw in {"n", "no"}:
-            return False
-        print("Please answer with 'y' or 'n'.")
 
 
 def _select_from_list(prompt: str, options: list[str]) -> int:
@@ -377,7 +376,7 @@ def run_agent_vs_agent() -> None:
         agent_1=right,
         n_battles=n_battles,
         n_jobs=-1,
-        verbose=False,
+        verbose=True,
         reseed_each_battle=True,
     )
 
